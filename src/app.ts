@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 
 import api_router from "./api_routes/api";
-import {IResponse, RES_TYPE} from "./utils/interfaces/response-interface";
+import {IErrPayload, IResponse, RES_TYPE} from "./utils/interfaces/response-interface";
 
 dotenv.config({
     path: path.join(__dirname, "../.env"),
@@ -25,8 +25,11 @@ app.use(cors({
 app.use("/api", api_router);
 
 app.use("/", (req, res, next) => {
-    const response: IResponse = {
+    const response: IResponse<IErrPayload> = {
         type: RES_TYPE.NOT_FOUND,
+        payload: {
+            msg: "404 NOT FOUND.",
+        }
     }
     res.status(404).json(response);
 })
