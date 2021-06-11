@@ -1,6 +1,7 @@
 export enum RES_TYPE {
     NOT_FOUND = 'NOT_FOUND',
     NOT_AUTHENTICATED = "NOT_AUTHENTICATED",
+    AUTH_SUCCESS = "AUTH_SUCCESS",
     SERVER_ERROR = "SERVER_ERROR",
     REGISTER_ERR = "REGISTER_ERR",
     REGISTER_SUCCESS = "REGISTER_SUCCESS",
@@ -11,8 +12,8 @@ export enum RES_TYPE {
 
 export interface IUser {
     user_name: string,
-    profile_pic?: string | null,
-    banner_pic?: string | null,
+    profile_pic?: string | null | undefined,
+    banner_pic?: string | null | undefined,
 }
 
 export interface IPostInfo {

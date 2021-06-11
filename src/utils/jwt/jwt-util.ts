@@ -37,6 +37,7 @@ const isAuthenticated: RequestHandler = async (req, res, next) => {
                 }
             }
             return res
+                    .status(401)
                     .clearCookie("access_token", {
                         httpOnly: true,
                     })
