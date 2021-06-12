@@ -18,6 +18,8 @@ export interface IUser {
     banner_pic?: string | null | undefined,
 }
 
+export type IProfile = IUser & {summary?: string};
+
 export interface IPostInfo {
     post_url: string,
     width?: number,

@@ -32,15 +32,19 @@ const clearOptions : CookieOptions = {
 }
 
 const isAuthenticated: RequestHandler = async (req, res, next) => {
+    console.log('trying to verify token');
     const access_token = req.cookies && req.cookies.access_token;
     const refresh_token = req.cookies && req.cookies.refresh_token;
     const [decoded_access, error_access] = (access_token) ? await verifyJWT(access_token) : [null, new Error()];
     if (error_access) {
+        console.log('access_token expired...attempting to use refresh_token');
         const [decoded_refresh, error_refresh] = (refresh_token) ? await verifyJWT(refresh_token) : [null, new Error()];
         if (error_refresh) {
+            console.log("refresh_token expired...")
             next(new AuthFailErr("You are not authenticated"))
         } else {
             const user_name = decoded_refresh.user_name;
+            console.log(`refresh_token succeeded for: ${user_name}`);
             const payload = {
                 user_name: user_name,
             }
@@ -51,6 +55,7 @@ const isAuthenticated: RequestHandler = async (req, res, next) => {
         }
     } else {
         res.locals.user_name = decoded_access.user_name;
+        console.log(`access_token succeeded for: ${res.locals.user_name}`);
         next();
     }
 }

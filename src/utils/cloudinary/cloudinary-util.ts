@@ -24,7 +24,7 @@ export const uploadProfilePic = async (file: Express.Multer.File, user_name: str
         const cloudinary_res = await new Promise((resolve, reject) => {
             const cld_upload_stream = cloudinaryV2.uploader.upload_stream({
                 public_id: `profile_pic`,
-                folder: `${user_name}_profile_pic`,
+                folder: `${user_name}/profile`,
                 overwrite: true,
             }, (err, res) => {
                 if (err) reject(err);
@@ -48,7 +48,7 @@ export const uploadBannerPic = async (file: Express.Multer.File, user_name: stri
         const cloudinary_res = await new Promise((resolve, reject) => {
             const cld_upload_stream = cloudinaryV2.uploader.upload_stream({
                 public_id: 'banner_pic',
-                folder: `${user_name}_banner_pic`,
+                folder: `${user_name}/profile`,
                 overwrite: true,
             }, (err, res) => {
                 if (err) reject(err);

@@ -10,8 +10,8 @@ import { IResponse, IErrPayload, RES_TYPE } from "../interfaces/response-interfa
 type ErrorResponse = IResponse<IErrPayload>;
 
 const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
-    switch (err) {
-        case err instanceof ImpropImgErr : {
+    switch (err.constructor) {
+        case ImpropImgErr : {
             const imgErr : ImpropImgErr = err;
             const response : ErrorResponse = {
                 type: RES_TYPE.INVALID_FIELD,
@@ -19,11 +19,12 @@ const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
                     msg: imgErr.msg,
                 }
             }
+            console.log(RES_TYPE.INVALID_FIELD)
             return res
                     .status(415)
                     .json(response)
         }
-        case err instanceof NotFoundErr : {
+        case NotFoundErr : {
             const nfErr : NotFoundErr = err;
             const response : ErrorResponse = {
                 type: RES_TYPE.NOT_FOUND,
@@ -31,11 +32,12 @@ const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
                     msg: nfErr.msg,
                 }
             }
+            console.log(RES_TYPE.NOT_FOUND)
             return res
                     .status(404)
                     .json(response)
         }
-        case err instanceof AuthFailErr : {
+        case AuthFailErr : {
             const authErr : AuthFailErr = err;
             const response : ErrorResponse = {
                 type: RES_TYPE.AUTH_FAILURE,
@@ -43,13 +45,14 @@ const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
                     msg: authErr.msg,
                 }
             }
+            console.log(RES_TYPE.AUTH_FAILURE)
             return res
                     .status(401)
                     .clearCookie("access_token", clearOptions)
                     .clearCookie("refresh_token", clearOptions)
                     .json(response)
         }
-        case err instanceof ServErr : {
+        case ServErr : {
             const srvErr : ServErr = err;
             const response : ErrorResponse = {
                 type: RES_TYPE.SERVER_ERROR,
@@ -57,11 +60,12 @@ const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
                     msg: srvErr.msg,
                 }
             }
+            console.log(RES_TYPE.SERVER_ERROR)
             return res
                     .status(500)
                     .json(response)
         }
-        case err instanceof UpdateFailErr : {
+        case UpdateFailErr : {
             const updateErr : UpdateFailErr = err;
             const response : ErrorResponse = {
                 type: RES_TYPE.UPDATE_FAIL,
@@ -69,9 +73,14 @@ const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
                     msg: updateErr.msg,
                 }
             }
+            console.log(RES_TYPE.UPDATE_FAIL)
             return res
                     .status(500)
                     .json(response)
+        }
+        default : {
+            console.log('uncaught error');
+            return res.status(500);
         }
     }
 }
