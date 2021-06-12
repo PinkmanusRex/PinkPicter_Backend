@@ -1,9 +1,13 @@
 import { RequestHandler } from "express";
 import bcryptjs from "bcryptjs";
 import mysql_pool, { query_helper } from "../utils/mysql/mysql-util";
-import { signJWT, access_token_options, refresh_token_options } from "../utils/jwt/jwt-util";
-import cloudinaryV2 from "../utils/cloudinary/cloudinary-util";
-import { IErrPayload, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
+import { signJWT, access_token_options, refresh_token_options, clearOptions } from "../utils/jwt/jwt-util";
+import cloudinaryV2, {uploadProfilePic, uploadBannerPic} from "../utils/cloudinary/cloudinary-util";
+import { IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
+import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
+import { ServErr } from "../utils/error_handling/ServErr";
+import { UpdateFailErr } from "../utils/error_handling/UpdateFailErr";
+import {multerFields} from "../utils/multer/multer-util";
 
 const validateUsernamePassword = (username: string, password: string) => {
     return !!(username.match(/^[a-zA-Z0-9_]{8,20}$/g) && password.match(/^[a-zA-Z0-9_]{8,20}$/g));
@@ -13,13 +17,7 @@ export const registrationHandler: RequestHandler = async (req, res, next) => {
     const user_name = req.body.user_name;
     const password = req.body.password;
     if (!validateUsernamePassword(user_name, password)) {
-        const response: IResponse<IErrPayload> = {
-            type: RES_TYPE.REGISTER_ERR,
-            payload: {
-                msg: "Invalid username or password syntax. Must match regex '^[a-zA-Z0-9_]{8, 20}$'"
-            }
-        }
-        return res.status(422).json(response);
+        next(new AuthFailErr("Invalid username or password. Must be 8 to 20 characters long, letters a through z (lower or upper), numbers, or underscore"));
     }
     const salt = bcryptjs.genSaltSync(10);
     const bcrypt_password = bcryptjs.hashSync(password, salt);
@@ -29,26 +27,14 @@ export const registrationHandler: RequestHandler = async (req, res, next) => {
             const [result, error] = await query_helper(connection, "INSERT INTO users(username, password) VALUES(?, ?)", [user_name, bcrypt_password]);
             if (error) {
                 if (error.code === 'ER_DUP_KEY') {
-                    const response: IResponse<IErrPayload> = {
-                        type: RES_TYPE.REGISTER_ERR,
-                        payload: {
-                            msg: "Username already taken.",
-                        }
-                    }
                     await connection.release();
-                    return res.status(422).json(response);
+                    next(new AuthFailErr("Username already taken"));
                 } else if (error.code.match(/DEADLOCK/g)) {
                     continue;
                 } else {
                     console.log(error.code);
-                    const response: IResponse<IErrPayload> = {
-                        type: RES_TYPE.SERVER_ERROR,
-                        payload: {
-                            msg: "Something went wrong in database."
-                        }
-                    }
                     await connection.release();
-                    return res.status(500).json(response);
+                    next(new ServErr("Something went wrong in the database"));
                 }
             } else {
                 const response: IResponse<IUser> = {
@@ -74,17 +60,11 @@ export const registrationHandler: RequestHandler = async (req, res, next) => {
             }
         }
     } catch (error) {
-        const response: IResponse<IErrPayload> = {
-            type: RES_TYPE.SERVER_ERROR,
-            payload: {
-                msg: "Could not get database connection.",
-            }
-        }
-        return res.status(500).json(response);
+        next(new ServErr("Could not get a database connection"));
     }
 }
 
-export const loginHandler : RequestHandler = async (req, res, next) => {
+export const loginHandler: RequestHandler = async (req, res, next) => {
     const user_name = req.body.user_name;
     const user_password = req.body.password;
     try {
@@ -96,27 +76,15 @@ export const loginHandler : RequestHandler = async (req, res, next) => {
                     continue;
                 } else {
                     console.log(error.code);
-                    const response: IResponse<IErrPayload> = {
-                        type: RES_TYPE.SERVER_ERROR,
-                        payload: {
-                            msg: "Something went wrong in database",
-                        }
-                    }
                     await connection.release();
-                    return res.status(500).json(response);
+                    next(new ServErr("Something went wrong in the database"));
                 }
             } else {
                 if (result.length === 0) {
-                    const response: IResponse<IErrPayload> = {
-                        type: RES_TYPE.LOGIN_FAILURE,
-                        payload: {
-                            msg: "User credentials incorrect",
-                        }
-                    }
                     await connection.release();
-                    return res.status(401).json(response);
+                    next(new AuthFailErr("User credentials incorrect"));
                 } else {
-                    const {username, password, profile_pic_id, banner_public_id} = result[0];
+                    const { username, password, profile_pic_id, banner_public_id } = result[0];
                     if (bcryptjs.compareSync(user_password, password)) {
                         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
                         const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id) : null;
@@ -141,45 +109,29 @@ export const loginHandler : RequestHandler = async (req, res, next) => {
                             .cookie("refresh_token", refresh_token, refresh_token_options)
                             .json(response);
                     } else {
-                        const response: IResponse<IErrPayload> = {
-                            type: RES_TYPE.LOGIN_FAILURE,
-                            payload: {
-                                msg: "User credentials incorrect",
-                            }
-                        }
                         await connection.release();
-                        return res.status(401).json(response);
+                        next(new AuthFailErr("User credentials incorrect"));
                     }
                 }
             }
         }
     } catch (e) {
-        const response: IResponse<IErrPayload> = {
-            type: RES_TYPE.SERVER_ERROR,
-            payload: {
-                msg: "Could not get a database connection"
-            }
-        }
-        return res.status(500).json(response);
+        next(new ServErr("Could not get a database connection"));
     }
 }
 
-export const logoutHandler : RequestHandler = async (req, res, next) => {
-    const response : IResponse<null> = {
+export const logoutHandler: RequestHandler = async (req, res, next) => {
+    const response: IResponse<null> = {
         type: RES_TYPE.LOGOUT_SUCCESS,
     }
     return res
-            .status(200)
-            .clearCookie("access_token", {
-                httpOnly: true,
-            })
-            .clearCookie("refresh_token", {
-                httpOnly: true,
-            })
-            .json(response)
+        .status(200)
+        .clearCookie("access_token", clearOptions)
+        .clearCookie("refresh_token", clearOptions)
+        .json(response)
 }
 
-export const verifyAuth : RequestHandler = async (req, res, next) => {
+export const verifyAuth: RequestHandler = async (req, res, next) => {
     const user_name = res.locals.user_name;
     if (user_name) {
         try {
@@ -191,38 +143,18 @@ export const verifyAuth : RequestHandler = async (req, res, next) => {
                         continue;
                     } else {
                         console.log(error.code);
-                        const response : IResponse<IErrPayload> = {
-                            type: RES_TYPE.SERVER_ERROR,
-                            payload: {
-                                msg: "Something went wrong in database",
-                            }
-                        }
                         await connection.release();
-                        return res.status(500).json(response);
+                        next(new ServErr("Something went wrong in database"));
                     }
                 } else {
                     if (result.length == 0) {
-                        const response: IResponse<IErrPayload> = {
-                            type: RES_TYPE.NOT_AUTHENTICATED,
-                            payload: {
-                                msg: "Invalid authentication",
-                            }
-                        }
                         await connection.release();
-                        return res
-                                .status(401)
-                                .clearCookie("access_token", {
-                                    httpOnly: true,
-                                })
-                                .clearCookie("refresh_token", {
-                                    httpOnly: true,
-                                })
-                                .json(response);
+                        next(new AuthFailErr("Invalid authentication"));
                     } else {
-                        const {username, profile_pic_id, banner_public_id} = result[0];
+                        const { username, profile_pic_id, banner_public_id } = result[0];
                         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
                         const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id) : null;
-                        const response : IResponse<IUser> = {
+                        const response: IResponse<IUser> = {
                             type: RES_TYPE.AUTH_SUCCESS,
                             payload: {
                                 user_name: username,
@@ -236,21 +168,131 @@ export const verifyAuth : RequestHandler = async (req, res, next) => {
                 }
             }
         } catch (error) {
-            const response: IResponse<IErrPayload> = {
-                type: RES_TYPE.SERVER_ERROR,
-                payload: {
-                    msg: "Could not get a database connection",
-                }
-            }
-            return res.status(500).json(response);
+            next(new ServErr("Could not get a database connection"));
         }
     } else {
-        const response : IResponse<IErrPayload> = {
-            type: RES_TYPE.NOT_AUTHENTICATED,
-            payload: {
-                msg: "No tokens to verify"
+        next(new AuthFailErr("No token to verify"));
+    }
+}
+
+export const editProfileHandler: RequestHandler = async (req, res, next) => {
+    const user_name = res.locals.user_name;
+    let banner_return_url : string | null = null;
+    let profile_return_url : string | null = null;
+    try {
+        let connection = await mysql_pool.getConnection();
+        while (true) {
+            const [result, error] = await query_helper(connection, "SELECT username FROM users WHERE username = ?", [user_name]);
+            if (error) {
+                if (error.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
+                    console.log(error.code);
+                    await connection.release();
+                    next(new ServErr("Something went wrong in the database"));
+                }
+            } else {
+                if (result.length === 0) {
+                    await connection.release();
+                    next(new AuthFailErr("User not found"));
+                } else {
+                    await connection.release();
+                    break;
+                }
             }
         }
-        return res.status(401).json(response);
+        if (req.files) {
+            const files = req.files as multerFields;
+            if (files.profile_pic && files.profile_pic.length > 0) {
+                const profile_pic = files.profile_pic[0];
+                const [cld_result, cld_error] = await uploadProfilePic(profile_pic, user_name);
+                if (cld_error) {
+                    console.log(cld_error.message);
+                    next(new ServErr(cld_error.message));
+                } else {
+                    connection = await mysql_pool.getConnection();
+                    while (true) {
+                        const [result, error] = await query_helper(connection, "UPDATE users SET profile_pic_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
+                        if (error) {
+                            if (error.code.match(/DEADLOCK/g)) {
+                                continue;
+                            } else {
+                                console.log(error.code);
+                                await connection.release();
+                                next(new ServErr("Something went wrong in the database"));
+                            }
+                        } else {
+                            await connection.release();
+                            if (result && result.affectedRows && result.affectedRows <= 0) {
+                                next(new AuthFailErr("User not found"));
+                            }
+                            profile_return_url = cld_result!.url;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (files.banner_pic && files.banner_pic.length > 0) {
+                const banner_pic = files.banner_pic[0];
+                const [cld_result, cld_error] = await uploadBannerPic(banner_pic, user_name);
+                if (cld_error) {
+                    console.log(cld_error.message);
+                    next(new ServErr(cld_error.message));
+                } else {
+                    connection = await mysql_pool.getConnection();
+                    while (true) {
+                        const [result, error] = await query_helper(connection, "UPDATE users SET banner_public_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
+                        if (error) {
+                            if (error.code.match(/DEADLOCK/g)) {
+                                continue;
+                            } else {
+                                console.log(error.code);
+                                await connection.release();
+                                next(new ServErr("Something went wrong in the database"));
+                            }
+                        } else {
+                            await connection.release();
+                            if (result && result.affectedRows && result.affectedRows <= 0) {
+                                next(new AuthFailErr("User not found"));
+                            }
+                            banner_return_url = cld_result!.url;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        const summary = req.body.summary;
+        connection = await mysql_pool.getConnection();
+        while (true) {
+            const [result, error] = await query_helper(connection, "UPDATE users SET summary = ? WHERE username = ?", [summary, user_name]);
+            if (error) {
+                if (error.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
+                    console.log(error.code);
+                    await connection.release();
+                    next(new ServErr("Something went wrong in the database"));
+                }
+            } else {
+                await connection.release();
+                if (result && result.affectedRows && result.affectedRows <= 0) {
+                    next(new AuthFailErr("User not found"));
+                }
+                const response : IResponse<IUser> = {
+                    type: RES_TYPE.AUTH_SUCCESS,
+                    payload: {
+                        user_name: user_name,
+                        profile_pic: profile_return_url,
+                        banner_pic: banner_return_url,
+                    }
+                }
+                return res
+                        .status(200)
+                        .json(response);
+            }
+        }
+    } catch (e) {
+        next(new ServErr("Could not get a database connection"));
     }
 }

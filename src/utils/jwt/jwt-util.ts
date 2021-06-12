@@ -1,8 +1,9 @@
 import jwt from "jsonwebtoken";
 import path from "path";
 import dotenv from "dotenv";
-import { RequestHandler } from "express";
+import { CookieOptions, RequestHandler } from "express";
 import { IErrPayload, IResponse, RES_TYPE } from "../interfaces/response-interface";
+import {AuthFailErr} from "../error_handling/AuthFailErr";
 
 dotenv.config({
     path: path.join(__dirname, "../../../.env"),
@@ -13,14 +14,21 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const one_day = 1000 * 60 * 60 * 24;
 const one_year = one_day * 365;
 
-const access_token_options = {
+const access_token_options : CookieOptions = {
     httpOnly: true,
     maxAge: one_day,
+    sameSite: 'lax',
 }
 
-const refresh_token_options = {
+const refresh_token_options : CookieOptions = {
     httpOnly: true,
     maxAge: one_year,
+    sameSite: 'lax',
+}
+
+const clearOptions : CookieOptions = {
+    httpOnly: true,
+    sameSite: 'lax',
 }
 
 const isAuthenticated: RequestHandler = async (req, res, next) => {
@@ -30,21 +38,7 @@ const isAuthenticated: RequestHandler = async (req, res, next) => {
     if (error_access) {
         const [decoded_refresh, error_refresh] = (refresh_token) ? await verifyJWT(refresh_token) : [null, new Error()];
         if (error_refresh) {
-            const response : IResponse<IErrPayload> = {
-                type: RES_TYPE.NOT_AUTHENTICATED,
-                payload: {
-                    msg: "You are not authenticated."
-                }
-            }
-            return res
-                    .status(401)
-                    .clearCookie("access_token", {
-                        httpOnly: true,
-                    })
-                    .clearCookie("refresh_token", {
-                        httpOnly: true,
-                    })
-                    .json(response)
+            next(new AuthFailErr("You are not authenticated"))
         } else {
             const user_name = decoded_refresh.user_name;
             const payload = {
@@ -81,6 +75,6 @@ const signJWT = (token: { [key: string]: any }, expiresIn: string) => {
     })
 }
 
-export { verifyJWT, signJWT, one_day, one_year, access_token_options, refresh_token_options };
+export { verifyJWT, signJWT, one_day, one_year, access_token_options, refresh_token_options, clearOptions };
 
 export default isAuthenticated;

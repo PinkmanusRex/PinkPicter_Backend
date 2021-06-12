@@ -17,6 +17,7 @@ const queue_limit = process.env.MYSQL_QUEUE_LIMIT ? parseInt(process.env.MYSQL_Q
 const pool_original = mysql.createPool({
     host: host,
     user: user,
+    database: db,
     password: password,
     waitForConnections: true,
     connectionLimit: connection_limit,

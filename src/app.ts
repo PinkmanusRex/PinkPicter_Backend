@@ -1,11 +1,12 @@
 import path from "path";
 import dotenv from "dotenv";
-import express from "express";
+import express, { ErrorRequestHandler } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 
 import api_router from "./api_routes/api";
 import {IErrPayload, IResponse, RES_TYPE} from "./utils/interfaces/response-interface";
+import errorHandler from "./utils/error_handling/error-handler-util";
 
 dotenv.config({
     path: path.join(__dirname, "../.env"),
@@ -17,7 +18,7 @@ const SERVER_PORT = process.env.SERVER_PORT || "8080";
 const app = express();
 
 app.use(cors({
-    origin: "*",
+    origin: "http://localhost:3000",
     optionsSuccessStatus: 200,
     credentials: true,
 }))
@@ -36,6 +37,8 @@ app.use("/", (req, res, next) => {
     }
     res.status(404).json(response);
 })
+
+app.use(errorHandler);
 
 app.listen(SERVER_PORT, () => {
     console.log(`Listening on :${SERVER_PORT}`);
