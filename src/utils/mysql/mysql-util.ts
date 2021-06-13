@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 import mysql from "mysql2";
 import path from "path";
 import { PoolConnection } from "mysql2/promise";
+import { NextFunction } from "express";
+import { ServErr } from "../error_handling/ServErr";
 
 dotenv.config({
     path: path.join(__dirname, "../../../.env"),
@@ -28,7 +30,7 @@ const pool_original = mysql.createPool({
 
 const mysql_pool = pool_original.promise();
 
-const query_helper = async (connection: PoolConnection, query: string, values: any[])  => {
+export const query_helper = async (connection: PoolConnection, query: string, values: any[])  => {
     try {
         const [results, fields] = await connection.query(query, values);
         return [results, null];
@@ -37,6 +39,35 @@ const query_helper = async (connection: PoolConnection, query: string, values: a
     }
 }
 
-export {query_helper};
+export const transaction_helper = async (connection: PoolConnection) => {
+    try {
+        await connection.beginTransaction();
+        return null;
+    } catch (e) {
+        return e;
+    }
+}
+
+export const rollback_helper = async (connection: PoolConnection, next: NextFunction, loopController: {current: boolean}) => {
+    try {
+        await connection.rollback();
+    } catch (e) {
+        console.log("Encountered rollback error");
+        loopController.current = false;
+        return next(new ServErr("Encountered a database error"));
+    }
+}
+
+export const commit_helper = async (connection: PoolConnection, next: NextFunction, loopController: {current: boolean}) => {
+    try {
+        await connection.commit();
+    } catch (e) {
+        console.log("Encountered a commit error");
+        await rollback_helper(connection, next, loopController);
+        if (!loopController.current) return;
+        await connection.release();
+        return next(new ServErr("Encountered a database error"));
+    }
+}
 
 export default mysql_pool;

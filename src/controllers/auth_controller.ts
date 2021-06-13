@@ -6,7 +6,6 @@ import cloudinaryV2, {uploadProfilePic, uploadBannerPic} from "../utils/cloudina
 import { IProfile, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
 import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
 import { ServErr } from "../utils/error_handling/ServErr";
-import { UpdateFailErr } from "../utils/error_handling/UpdateFailErr";
 import {multerFields} from "../utils/multer/multer-util";
 
 const validateUsernamePassword = (username: string, password: string) => {
@@ -186,6 +185,7 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
 
 export const editProfileHandler: RequestHandler = async (req, res, next) => {
     const user_name = res.locals.user_name;
+    console.log(`Editing profile of: ${user_name}`);
     let banner_return_url : string | null = null;
     let profile_return_url : string | null = null;
     try {
@@ -288,6 +288,7 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
             } else {
                 await connection.release();
                 if (result && result.affectedRows && result.affectedRows <= 0) {
+                    console.log("User not found");
                     return next(new AuthFailErr("User not found"));
                 }
                 const response : IResponse<IUser> = {
@@ -304,6 +305,7 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
             }
         }
     } catch (e) {
+        console.log("Could not get a database connection")
         return next(new ServErr("Could not get a database connection"));
     }
 }

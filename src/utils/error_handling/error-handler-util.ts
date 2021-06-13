@@ -6,6 +6,7 @@ import {AuthFailErr} from "./AuthFailErr";
 import {ServErr} from "./ServErr";
 import {UpdateFailErr} from "./UpdateFailErr";
 import { IResponse, IErrPayload, RES_TYPE } from "../interfaces/response-interface";
+import { InvalidFieldError } from "./InvalidFieldError";
 
 type ErrorResponse = IResponse<IErrPayload>;
 
@@ -77,8 +78,19 @@ const errorHandler : ErrorRequestHandler = (err, req, res ,next) => {
             return res
                     .status(500)
                     .json(response)
-        }
-        default : {
+        } case InvalidFieldError : {
+            const invalidFieldErr : InvalidFieldError = err;
+            const response : ErrorResponse = {
+                type: RES_TYPE.INVALID_FIELD,
+                payload: {
+                    msg: invalidFieldErr.msg,
+                }
+            }
+            console.log(RES_TYPE.INVALID_FIELD)
+            return res
+                    .status(415)
+                    .json(response)
+        } default : {
             console.log('uncaught error');
             return res.status(500);
         }

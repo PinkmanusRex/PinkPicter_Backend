@@ -19,7 +19,14 @@ cloudinaryV2.config({
     api_secret: CLOUDINARY_SECRET,
 })
 
-export const uploadProfilePic = async (file: Express.Multer.File, user_name: string): Promise<[{ public_id: string, width: number, height: number, url: string } | null, cloudinary.UploadApiErrorResponse | null]> => {
+export interface ICloudUploadResponse {
+    public_id: string,
+    width: number,
+    height: number,
+    url: string,
+}
+
+export const uploadProfilePic = async (file: Express.Multer.File, user_name: string): Promise<[ICloudUploadResponse | null, cloudinary.UploadApiErrorResponse | null]> => {
     try {
         const cloudinary_res = await new Promise((resolve, reject) => {
             const cld_upload_stream = cloudinaryV2.uploader.upload_stream({
@@ -43,7 +50,7 @@ export const uploadProfilePic = async (file: Express.Multer.File, user_name: str
     }
 }
 
-export const uploadBannerPic = async (file: Express.Multer.File, user_name: string) : Promise<[{public_id: string, width: number, height: number, url: string} | null, cloudinary.UploadApiErrorResponse | null]> => {
+export const uploadBannerPic = async (file: Express.Multer.File, user_name: string) : Promise<[ICloudUploadResponse | null, cloudinary.UploadApiErrorResponse | null]> => {
     try{
         const cloudinary_res = await new Promise((resolve, reject) => {
             const cld_upload_stream = cloudinaryV2.uploader.upload_stream({
@@ -61,6 +68,34 @@ export const uploadBannerPic = async (file: Express.Multer.File, user_name: stri
         const height = (cloudinary_res as cloudinary.UploadApiResponse).height;
         const url = (cloudinary_res as cloudinary.UploadApiResponse).secure_url;
         return [{public_id, width, height, url}, null];
+    } catch (e) {
+        const err = (e as cloudinary.UploadApiErrorResponse);
+        return [null, err];
+    }
+}
+
+export const uploadPostPic = async (file: Express.Multer.File, user_name: string, arg_public_id : string | null) : Promise<[ICloudUploadResponse | null, cloudinary.UploadApiErrorResponse | null]> => {
+    try {
+        const cloud_options = arg_public_id ? {
+            public_id: arg_public_id.match(new RegExp(`^${user_name}/posts/(.+)$`))![1],
+            folder: `${user_name}/posts`,
+            overwrite: true,
+        } : {
+            folder: `${user_name}/posts`,
+        }
+        const cloudinary_res = await new Promise((resolve, reject) => {
+            const cld_upload_stream = cloudinaryV2.uploader.upload_stream(cloud_options, (err, res) => {
+                if (err) reject(err);
+                else resolve(res);
+            })
+            streamifier.createReadStream(file.buffer).pipe(cld_upload_stream);
+        })
+        const cloud_response = cloudinary_res as cloudinary.UploadApiResponse;
+        const public_id = cloud_response.public_id;
+        const width = cloud_response.width;
+        const height = cloud_response.height;
+        const url = cloud_response.secure_url;
+        return [{public_id, width, height, url}, null]
     } catch (e) {
         const err = (e as cloudinary.UploadApiErrorResponse);
         return [null, err];

@@ -10,6 +10,7 @@ export enum RES_TYPE {
     LOGOUT_SUCCESS = "LOGOUT_SUCCESS",
     INVALID_FIELD = "INVALID_FIELD",
     UPDATE_FAIL = "UPDATE_FAIL",
+    POST_SUCCESS = "POST_SUCCESS",
 }
 
 export interface IUser {
