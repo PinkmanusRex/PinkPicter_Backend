@@ -30,7 +30,7 @@ const pool_original = mysql.createPool({
 
 const mysql_pool = pool_original.promise();
 
-export const query_helper = async (connection: PoolConnection, query: string, values: any[])  => {
+export const query_helper = async (connection: PoolConnection, query: string, values: any[]) : Promise<[any, mysql.QueryError | null]> => {
     try {
         const [results, fields] = await connection.query(query, values);
         return [results, null];
