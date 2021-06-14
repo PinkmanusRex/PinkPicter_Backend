@@ -51,12 +51,6 @@ export interface IErrPayload {
     msg: string,
 }
 
-export interface IVerifyPayload {
-    user_name: string,
-    banner?: string,
-    profile_pic?: string,
-}
-
 export interface IResponse< S >{
     type: RES_TYPE,
     payload?: S,
