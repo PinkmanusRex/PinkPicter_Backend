@@ -2,8 +2,8 @@ import { RequestHandler } from "express";
 import cloudinaryV2 from "../utils/cloudinary/cloudinary-util";
 import { NotFoundErr } from "../utils/error_handling/NotFoundErr";
 import { ServErr } from "../utils/error_handling/ServErr";
-import { IPostInfo, IProfile, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
-import mysql_pool, { query_helper } from "../utils/mysql/mysql-util";
+import { IPostInfo, IProfile, IResponse, ISearchPayload, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
+import mysql_pool, { commit_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
 
 export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
     const user_name = req.params.user_name;
@@ -64,22 +64,55 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
     try {
         const connection = await mysql_pool.getConnection();
         let query_arr : any = [];
-        while (true) {
+        let count_pages = 0;
+        const loopController = {
+            current: true,
+        }
+        while (loopController.current) {
+            const err = await transaction_helper(connection);
+            if (err) {
+                await connection.release();
+                console.log("Could not begin transaction");
+                return next(new ServErr("Encountered a database error"));
+            }
+            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM favorites WHERE username = ?", [user_name]);
+            if (count_err) {
+                if (count_err.code.match(/DEADLOCK/g)) {
+                    console.log(count_err.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
+                    continue;
+                } else {
+                    console.log(count_err.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
+                    await connection.release();
+                    return next(new ServErr("Something went wrong in the database"));
+                }
+            }
             const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND post_public_id IN (SELECT post_public_id FROM favorites WHERE username = ?) ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
                 if (error.code.match(/DEADLOCK/g)) {
                     console.log(error.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
                     continue;
                 } else {
                     console.log(error.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
+                    await connection.release();
                     return next(new ServErr("Something went wrong in the database"));
                 }
             } else {
+                count_pages = Math.ceil(count[0].count/limit);
                 query_arr = result;
+                await commit_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                await connection.release();
                 break;
             }
         }
-        await connection.release();
         const result_arr = query_arr.map((item : any) => {
             const post_pic_url : string = cloudinaryV2.url(item.post_public_id);
             const post_id : string = item.post_public_id;
@@ -98,9 +131,12 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
             }
             return post;
         })
-        const response : IResponse<IPostInfo[]> = {
+        const response : IResponse<ISearchPayload> = {
             type: RES_TYPE.GET_SUCCESS,
-            payload: result_arr,
+            payload: {
+                count_pages: count_pages,
+                posts: result_arr,
+            },
         }
         return res
                 .status(200)
@@ -117,23 +153,56 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
     const offset = (page_no - 1) * limit;
     try {
         const connection = await mysql_pool.getConnection();
+        let count_pages = 0;
         let query_arr: any = [];
-        while (true) {
+        const loopController = {
+            current: true,
+        }
+        while (loopController.current) {
+            const err = await transaction_helper(connection);
+            if (err) {
+                await connection.release();
+                console.log("Could not begin a transaction");
+                return next(new ServErr("Encountered a database error"));
+            }
+            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM posts WHERE artist_name = ?", [user_name]);
+            if (count_err) {
+                if (count_err.code.match(/DEADLOCK/g)) {
+                    console.log(count_err.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
+                    continue;
+                } else {
+                    console.log(count_err.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
+                    await connection.release();
+                    return next(new ServErr("Encountered a database error"));
+                }
+            }
             const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND username = ? ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
                 if (error.code.match(/DEADLOCK/g)) {
                     console.log(error.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
                     continue;
                 } else {
                     console.log(error.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
+                    await connection.release();
                     return next(new ServErr("Something went wrong in the database"));
                 }
             } else {
+                count_pages = Math.ceil(count[0].count/limit);
                 query_arr = result;
+                await commit_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                await connection.release();
                 break;
             }
         }
-        await connection.release();
         const result_arr = query_arr.map((item : any) => {
             const post_pic_url : string = cloudinaryV2.url(item.post_public_id);
             const post_id : string = item.post_public_id;
@@ -152,9 +221,12 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
             }
             return post;
         })
-        const response : IResponse<IPostInfo[]> = {
+        const response : IResponse<ISearchPayload> = {
             type: RES_TYPE.GET_SUCCESS,
-            payload: result_arr,
+            payload: {
+                count_pages: count_pages,
+                posts: result_arr,
+            }
         }
         return res
                 .status(200)

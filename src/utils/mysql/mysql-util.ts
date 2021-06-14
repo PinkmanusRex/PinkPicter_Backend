@@ -54,6 +54,7 @@ export const rollback_helper = async (connection: PoolConnection, next: NextFunc
     } catch (e) {
         console.log("Encountered rollback error");
         loopController.current = false;
+        await connection.release();
         return next(new ServErr("Encountered a database error"));
     }
 }

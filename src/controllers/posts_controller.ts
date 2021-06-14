@@ -33,6 +33,7 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
                     console.log(check_error.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
+                    await connection.release();
                     return next(new ServErr("Encountered a database error"));
                 }
             } else {

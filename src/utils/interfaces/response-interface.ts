@@ -44,6 +44,7 @@ export interface IPostPayload {
 }
 
 export interface ISearchPayload {
+    count_pages: number,
     posts: IPostInfo[],
 }
 
