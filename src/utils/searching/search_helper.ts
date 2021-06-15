@@ -4,7 +4,7 @@ import { InvalidFieldError } from "../error_handling/InvalidFieldError";
 const numeric_query_is_pos_number = (numeric_query : string) => {
     try {
         const val = parseInt(numeric_query);
-        if (val <= 0) return false;
+        if (isNaN(val) || val <= 0) return false;
         return true;
     } catch (e) {
         return false;

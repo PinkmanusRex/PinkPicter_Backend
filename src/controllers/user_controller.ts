@@ -114,7 +114,8 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
             }
         }
         const result_arr = query_arr.map((item : any) => {
-            const post_pic_url : string = cloudinaryV2.url(item.post_public_id);
+            const title: string = item.title;
+            const src : string = cloudinaryV2.url(item.post_public_id);
             const post_id : string = item.post_public_id;
             const user : IUser = {
                 user_name: item.artist_name,
@@ -123,11 +124,12 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
             const width : number = item.width;
             const height : number = item.height;
             const post : IPostInfo= {
-                post_pic_url,
+                src,
                 post_id,
                 user,
                 width,
                 height,
+                title,
             }
             return post;
         })
@@ -151,6 +153,7 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
     const page_no = (req.query.page_no) ? parseInt(req.query.page_no as string) : 1;
     const limit = (req.query.limit) ? parseInt(req.query.limit as string) : 20;
     const offset = (page_no - 1) * limit;
+    console.log(`Retrieving ${user_name}'s posts page=${page_no}`);
     try {
         const connection = await mysql_pool.getConnection();
         let count_pages = 0;
@@ -180,6 +183,7 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
                     return next(new ServErr("Encountered a database error"));
                 }
             }
+            console.log(`${user_name} has ${count[0].count} posts`);
             const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND username = ? ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
                 if (error.code.match(/DEADLOCK/g)) {
@@ -204,7 +208,8 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
             }
         }
         const result_arr = query_arr.map((item : any) => {
-            const post_pic_url : string = cloudinaryV2.url(item.post_public_id);
+            const title: string = item.title;
+            const src : string = cloudinaryV2.url(item.post_public_id);
             const post_id : string = item.post_public_id;
             const user : IUser = {
                 user_name: item.artist_name,
@@ -213,11 +218,12 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
             const width : number = item.width;
             const height : number = item.height;
             const post : IPostInfo = {
-                post_pic_url,
+                src,
                 post_id,
                 user,
                 width,
                 height,
+                title,
             }
             return post;
         })

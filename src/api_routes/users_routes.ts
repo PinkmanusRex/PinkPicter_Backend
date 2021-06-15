@@ -6,8 +6,9 @@ const users_router = express.Router({mergeParams: true});
 
 users_router.get("/get_profile/:user_name", getUserInfoHandler);
 
-users_router.get("/get_favorites/:user_id", searchQueryValidator, getUserPostsHandler);
+users_router.get("/get_favorites/:user_name", searchQueryValidator, getUserFavoritesHandler);
 
-users_router.get("/get_posts/:user_id", searchQueryValidator, getUserFavoritesHandler);
+users_router.get("/get_posts/:user_name", searchQueryValidator, getUserPostsHandler);
+
 
 export default users_router;

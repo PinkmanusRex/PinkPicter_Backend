@@ -23,7 +23,8 @@ export interface IUser {
 export type IProfile = IUser & {summary?: string};
 
 export interface IPostInfo {
-    post_pic_url: string,
+    title: string,
+    src: string,
     post_id: string,
     user: IUser,
     width?: number,
