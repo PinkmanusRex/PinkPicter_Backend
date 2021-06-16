@@ -71,4 +71,14 @@ export const commit_helper = async (connection: PoolConnection, next: NextFuncti
     }
 }
 
+export const connection_release_helper = async (connection: PoolConnection, next: NextFunction, err?: Error, res?: any) => {
+    if (err) {
+        await connection.release();
+        return next(err);
+    } else {
+        await connection.release();
+        return;
+    }
+}
+
 export default mysql_pool;

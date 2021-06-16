@@ -1,11 +1,15 @@
-import {  RequestHandler } from "express";
+import { RequestHandler } from "express";
 import cloudinary from "cloudinary";
-import mysql_pool, { commit_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
+import mysql_pool, { commit_helper, connection_release_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
 import cloudinaryV2, { ICloudUploadResponse, uploadPostPic } from "../utils/cloudinary/cloudinary-util";
 import { ServErr } from "../utils/error_handling/ServErr";
 import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
 import { IComment, IPostInfo, IPostPayload, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
 import { NotFoundErr } from "../utils/error_handling/NotFoundErr";
+
+const generic_db_msg = "Encountered a database error";
+const generic_user_nf_err = "User not found";
+const generic_post_nf_err = "Post not found";
 
 export const uploadPostHandler: RequestHandler = async (req, res, next) => {
     const user_name = res.locals.user_name;
@@ -19,9 +23,8 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
         while (loopController.current) {
             const err = await transaction_helper(connection);
             if (err) {
-                await connection.release();
                 console.log("Could not begin a transaction");
-                return next(new ServErr("Encountered a database error"));
+                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
             const [check, check_error] = await query_helper(connection, "SELECT username FROM users WHERE username = ?", [user_name]);
             if (check_error) {
@@ -34,15 +37,13 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
                     console.log(check_error.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Encountered a database error"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (check.length === 0) {
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new AuthFailErr("User not found"));
+                    return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 }
             }
             const post_pic = req.file as Express.Multer.File;
@@ -51,8 +52,7 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
                 console.log(cld_error.message);
                 await rollback_helper(connection, next, loopController);
                 if (!loopController.current) return;
-                await connection.release();
-                return next(new ServErr(cld_error.message));
+                return await connection_release_helper(connection, next, new ServErr(cld_error.message));
             } else {
                 public_id = (cld_result as ICloudUploadResponse).public_id;
                 const width = (cld_result as ICloudUploadResponse).width;
@@ -68,28 +68,23 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
                         console.log(error.code);
                         await rollback_helper(connection, next, loopController);
                         if (!loopController.current) return;
-                        await connection.release();
-                        return next(new AuthFailErr("User does not exist"));
+                        return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                     } else {
                         console.log(error.code);
                         await rollback_helper(connection, next, loopController);
                         if (!loopController.current) return;
-                        await connection.release();
-                        return next(new ServErr("Encountered a database error"));
+                        return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                     }
                 } else {
                     await commit_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
                     const response: IResponse<{ post_id: string }> = {
                         type: RES_TYPE.POST_SUCCESS,
                         payload: {
                             post_id: public_id,
                         }
                     }
-                    return res
-                        .status(200)
-                        .json(response);
+                    return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
                 }
             }
         }
@@ -105,17 +100,16 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
     console.log(`${user_name} attempting to retrieve ${post_id}`);
     try {
         const connection = await mysql_pool.getConnection();
-        let query_comments : any = [];
-        let query_post : any = null;
+        let query_comments: any = [];
+        let query_post: any = null;
         const loopController = {
             current: true,
         }
         while (loopController.current) {
             const err = await transaction_helper(connection);
             if (err) {
-                await connection.release();
                 console.log("Could not begin a transaction");
-                return next(new ServErr("Encountered a database error"));
+                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
             const [post, post_err] = await query_helper(connection, "SELECT IF(EXISTS(SELECT * FROM favorites WHERE post_public_id = ? AND username = ?), TRUE, FALSE) as favorited, post_public_id, artist_name, title, description, width, height, post_date, profile_pic_id FROM posts, users WHERE artist_name = username AND post_public_id = ?", [post_id, user_name, post_id]);
             if (post_err) {
@@ -128,15 +122,13 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
                     console.log(post_err.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Encountered a database error"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (post.length === 0) {
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new NotFoundErr("The post was not found"));
+                    return await connection_release_helper(connection, next, new NotFoundErr(generic_post_nf_err));
                 }
             }
             const [comments, comments_err] = await query_helper(connection, "SELECT c.username as username, c.comment_content as comment_content, c.post_date as post_date, c.comment_id as comment_id, profile_pic_id FROM comments as c, users WHERE c.username = users.username AND c.post_public_id = ? ORDER BY c.comment_id DESC", [post_id]);
@@ -150,26 +142,24 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
                     console.log(comments_err.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Encountered a database error"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 query_comments = comments;
                 query_post = post[0];
                 await commit_helper(connection, next, loopController);
                 if (!loopController.current) return;
-                await connection.release();
                 break;
             }
         }
         const comments_arr = query_comments.map((item: any) => {
-            const user_name : string = item.username;
-            const profile_pic : string | null = (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id) : null;
-            const commenter : IUser = {
+            const user_name: string = item.username;
+            const profile_pic: string | null = (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id) : null;
+            const commenter: IUser = {
                 user_name,
                 profile_pic,
             }
-            const comment : IComment = {
+            const comment: IComment = {
                 comment_id: item.comment_id,
                 poster: commenter,
                 post_date: item.post_date,
@@ -177,7 +167,7 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
             }
             return comment;
         })
-        const post : IPostInfo = {
+        const post: IPostInfo = {
             title: query_post.title,
             src: cloudinaryV2.url(query_post.post_public_id),
             post_id: query_post.post_public_id,
@@ -198,9 +188,95 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
                 comments: comments_arr,
             }
         }
-        return res
-                .status(200)
-                .json(response);
+        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
+    } catch (e) {
+        console.log("Could not get a database connection");
+        return next(new ServErr("Could not get a database connection"));
+    }
+}
+
+export const addFavoritesHandler: RequestHandler = async (req, res, next) => {
+    const user_name = res.locals.user_name;
+    const post_id = req.body.post_id;
+    if (!user_name) {
+        return next(new AuthFailErr("Not signed in"));
+    }
+    console.log(`${user_name} trying to add ${post_id} to favorites`);
+    try {
+        const connection = await mysql_pool.getConnection();
+        while (true) {
+            const [check_user, check_user_error] = await query_helper(connection, "SELECT * FROM users WHERE username = ?", [user_name]);
+            if (check_user_error) {
+                if (check_user_error.code.match(/DEADLOCK/g)) {
+                    console.log(check_user_error.code);
+                    continue;
+                } else {
+                    console.log(check_user_error.code);
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            } else {
+                if (check_user.length === 0) {
+                    return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
+                }
+            }
+            const [add_fav_result, add_fav_result_error] = await query_helper(connection, "INSERT INTO favorites (username, post_public_id, favorite_date) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE favorite_date = VALUES(favorite_date)", [user_name, post_id, new Date()]);
+            if (add_fav_result_error) {
+                if (add_fav_result_error.code.match(/DEADLOCK/g)) {
+                    console.log(add_fav_result_error.code);
+                    continue;
+                } else if (add_fav_result_error.code.match(/ER_NO_REFERENCED_ROW/g)) {
+                    console.log(add_fav_result_error.code);
+                    return await connection_release_helper(connection, next, new NotFoundErr(generic_post_nf_err))
+                } else {
+                    console.log(add_fav_result_error.code);
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            } else {
+                return await connection_release_helper(connection, next, undefined, res.status(200).json({}))
+            }
+        }
+    } catch (e) {
+        console.log('Could not get a database connection');
+        return next(new ServErr("Could not get a database connection"));
+    }
+}
+
+export const removeFavoritesHandler: RequestHandler = async (req, res, next) => {
+    const user_name = res.locals.user_name;
+    const post_id = req.body.post_id;
+    if (!user_name) {
+        return next(new AuthFailErr("Not signed in"));
+    }
+    try {
+        const connection = await mysql_pool.getConnection();
+        while (true) {
+            const [check_user, check_user_error] = await query_helper(connection, "SELECT * FROM users WHERE username = ?", [user_name]);
+            if (check_user_error) {
+                if (check_user_error.code.match(/DEADLOCK/g)) {
+                    console.log(check_user_error.code);
+                    continue;
+                } else {
+                    console.log(check_user_error.code);
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            } else {
+                if (check_user.length === 0) {
+                    return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
+                }
+            }
+            const [delete_result, delete_result_err] = await query_helper(connection, "DELETE FROM favorites WHERE username = ? AND post_public_id = ?", [user_name, post_id]);
+            if (delete_result_err) {
+                if (delete_result_err.code.match(/DEADLOCK/g)) {
+                    console.log(delete_result_err.code);
+                    continue;
+                } else {
+                    console.log(delete_result_err.code);
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            } else {
+                return await connection_release_helper(connection, next, undefined, res.status(200).json({}));
+            }
+        }
     } catch (e) {
         console.log("Could not get a database connection");
         return next(new ServErr("Could not get a database connection"));
