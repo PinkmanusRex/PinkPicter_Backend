@@ -15,8 +15,8 @@ connection.connect((err) => {
 let connectionPromise = connection.promise();
 
 const fun = async () => {
-    const [rows, fields] = await connectionPromise.query("SELECT * from album where id=335");
-    console.log(('length' in rows) ? rows.length : rows);
+    const [rows, fields] = await connectionPromise.query("SELECT NULL");
+    console.log((rows as any)[0].NULL === null);
 }
 
 fun();

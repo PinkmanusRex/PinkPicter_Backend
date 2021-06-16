@@ -21,12 +21,15 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                     continue;
                 } else {
                     console.log(error.code);
+                    await connection.release();
                     return next(new ServErr("Something went wrong in the database"));
                 }
             } else {
                 if (result.length === 0) {
+                    await connection.release();
                     return next(new NotFoundErr("The user was not found"));
                 } else {
+                    await connection.release();
                     profile_pic_id = result[0].profile_pic_id;
                     banner_id = result[0].banner_public_id;
                     summary = result[0].summary;
@@ -34,7 +37,6 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                 }
             }
         }
-        await connection.release();
         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
         const banner_pic_url = (banner_id) ? await cloudinaryV2.url(banner_id) : null;
         summary = (summary) ? summary : '';

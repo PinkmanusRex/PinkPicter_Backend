@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import path from "path";
 import dotenv from "dotenv";
 import { CookieOptions, RequestHandler } from "express";
-import { IErrPayload, IResponse, RES_TYPE } from "../interfaces/response-interface";
 import {AuthFailErr} from "../error_handling/AuthFailErr";
 
 dotenv.config({

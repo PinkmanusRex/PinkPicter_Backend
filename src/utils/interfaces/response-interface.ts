@@ -31,15 +31,17 @@ export interface IPostInfo {
     height?: number,
     description?: string,
     favorited?: boolean,
+    post_date?: Date,
 }
 
 export interface IComment {
+    comment_id : number,
     poster: IUser,
+    post_date : Date,
     comment: string,
 }
 
 export interface IPostPayload {
-    poster: IUser,
     post: IPostInfo,
     comments: IComment[],
 }
