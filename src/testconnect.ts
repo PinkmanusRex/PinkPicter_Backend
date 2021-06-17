@@ -1,4 +1,5 @@
 import mysql from "mysql2";
+import cloudinaryV2 from "./utils/cloudinary/cloudinary-util";
 
 let connection = mysql.createConnection({
     host: 'localhost',
@@ -14,9 +15,4 @@ connection.connect((err) => {
 
 let connectionPromise = connection.promise();
 
-const fun = async () => {
-    const [rows, fields] = await connectionPromise.query("SELECT NULL");
-    console.log((rows as any)[0].NULL === null);
-}
-
-fun();
+console.log(cloudinaryV2.url('little_nuns/profile/profile_pic'));

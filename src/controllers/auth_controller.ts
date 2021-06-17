@@ -1,12 +1,13 @@
 import { RequestHandler } from "express";
 import bcryptjs from "bcryptjs";
-import mysql_pool, { query_helper } from "../utils/mysql/mysql-util";
+import mysql_pool, { connection_release_helper, query_helper } from "../utils/mysql/mysql-util";
 import { signJWT, access_token_options, refresh_token_options, clearOptions } from "../utils/jwt/jwt-util";
 import cloudinaryV2, {uploadProfilePic, uploadBannerPic} from "../utils/cloudinary/cloudinary-util";
 import { IProfile, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
 import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
 import { ServErr } from "../utils/error_handling/ServErr";
 import {multerFields} from "../utils/multer/multer-util";
+import { generic_db_msg, generic_fail_to_get_connection, generic_user_nf_err } from "../utils/generic_error_msg";
 
 const validateUsernamePassword = (username: string, password: string) => {
     return !!(username.match(/^[a-zA-Z0-9_]{8,20}$/g) && password.match(/^[a-zA-Z0-9_]{8,20}$/g));
@@ -28,15 +29,13 @@ export const registrationHandler: RequestHandler = async (req, res, next) => {
             if (error) {
                 if (error.code === 'ER_DUP_KEY') {
                     console.log(`${error.code}: ${user_name}`);
-                    await connection.release();
-                    return next(new AuthFailErr("Username already taken"));
+                    return await connection_release_helper(connection, next, new AuthFailErr("Username already taken"));
                 } else if (error.code.match(/DEADLOCK/g)) {
                     console.log(error.code);
                     continue;
                 } else {
                     console.log(error.code);
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 const response: IResponse<IUser> = {
@@ -53,16 +52,15 @@ export const registrationHandler: RequestHandler = async (req, res, next) => {
                     user_name: user_name,
                 }
                 const refresh_token = signJWT(refresh_token_payload, "1y");
-                await connection.release();
-                return res
-                    .status(200)
-                    .cookie("access_token", access_token, access_token_options)
-                    .cookie("refresh_token", refresh_token, refresh_token_options)
-                    .json(response)
+                return await connection_release_helper(connection, next, undefined, res
+                            .status(200)
+                            .cookie("access_token", access_token, access_token_options)
+                            .cookie("refresh_token", refresh_token, refresh_token_options)
+                            .json(response));
             }
         }
     } catch (error) {
-        return next(new ServErr("Could not get a database connection"));
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -80,13 +78,11 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
                     continue;
                 } else {
                     console.log(error.code);
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (result.length === 0) {
-                    await connection.release();
-                    return next(new AuthFailErr("User credentials incorrect"));
+                    return await connection_release_helper(connection, next, new AuthFailErr("User credentials incorrect"));
                 } else {
                     const { username, password, profile_pic_id, banner_public_id } = result[0];
                     if (bcryptjs.compareSync(user_password, password)) {
@@ -100,27 +96,25 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
                                 banner_pic: banner_pic_url,
                             }
                         }
-                        await connection.release();
                         const access_token = await signJWT({
                             user_name: username,
                         }, "1d");
                         const refresh_token = await signJWT({
                             user_name: username,
                         }, "1y");
-                        return res
-                            .status(200)
-                            .cookie("access_token", access_token, access_token_options)
-                            .cookie("refresh_token", refresh_token, refresh_token_options)
-                            .json(response);
+                        return await connection_release_helper(connection, next, undefined, res
+                                        .status(200)
+                                        .cookie("access_token", access_token, access_token_options)
+                                        .cookie("refresh_token", refresh_token, refresh_token_options)
+                                        .json(response));
                     } else {
-                        await connection.release();
-                        return next(new AuthFailErr("User credentials incorrect"));
+                        return await connection_release_helper(connection, next, new AuthFailErr("User credentials incorrect"));
                     }
                 }
             }
         }
     } catch (e) {
-        return next(new ServErr("Could not get a database connection"));
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -149,16 +143,13 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
                         continue;
                     } else {
                         console.log(error.code);
-                        await connection.release();
-                        return next(new ServErr("Something went wrong in database"));
+                        return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                     }
                 } else {
                     if (result.length == 0) {
                         console.log(`Verifying failed for : ${user_name}`);
-                        await connection.release();
-                        return next(new AuthFailErr("Invalid authentication"));
+                        return await connection_release_helper(connection, next, new AuthFailErr("Invalid authentication"));
                     } else {
-                        await connection.release();
                         const { username, profile_pic_id, banner_public_id } = result[0];
                         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
                         const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id) : null;
@@ -171,14 +162,16 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
                             }
                         }
                         console.log(`Verification success: ${user_name}`);
-                        return res.status(200).json(response);
+                        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
                     }
                 }
             }
         } catch (error) {
-            return next(new ServErr("Could not get a database connection"));
+            console.log(generic_fail_to_get_connection);
+            return next(new ServErr(generic_fail_to_get_connection));
         }
     } else {
+        console.log("No token to verify");
         return next(new AuthFailErr("No token to verify"));
     }
 }
@@ -194,16 +187,15 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
             const [result, error] = await query_helper(connection, "SELECT username FROM users WHERE username = ?", [user_name]);
             if (error) {
                 if (error.code.match(/DEADLOCK/g)) {
+                    console.log(error.code);
                     continue;
                 } else {
                     console.log(error.code);
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (result.length === 0) {
-                    await connection.release();
-                    return next(new AuthFailErr("User not found"));
+                    return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 } else {
                     await connection.release();
                     break;
@@ -228,14 +220,13 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                                 continue;
                             } else {
                                 console.log(error.code);
-                                await connection.release();
-                                return next(new ServErr("Something went wrong in the database"));
+                                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                             }
                         } else {
-                            await connection.release();
                             if (result && result.affectedRows && result.affectedRows <= 0) {
-                                return next(new AuthFailErr("User not found"));
+                                return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                             }
+                            await connection.release();
                             profile_return_url = cld_result!.url;
                             break;
                         }
@@ -254,17 +245,17 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                         const [result, error] = await query_helper(connection, "UPDATE users SET banner_public_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
                         if (error) {
                             if (error.code.match(/DEADLOCK/g)) {
+                                console.log(error.code);
                                 continue;
                             } else {
                                 console.log(error.code);
-                                await connection.release();
-                                return next(new ServErr("Something went wrong in the database"));
+                                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                             }
                         } else {
-                            await connection.release();
                             if (result && result.affectedRows && result.affectedRows <= 0) {
-                                return next(new AuthFailErr("User not found"));
+                                return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                             }
+                            await connection.release();
                             banner_return_url = cld_result!.url;
                             break;
                         }
@@ -282,14 +273,12 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                     continue;
                 } else {
                     console.log(error.code);
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
-                await connection.release();
                 if (result && result.affectedRows && result.affectedRows <= 0) {
-                    console.log("User not found");
-                    return next(new AuthFailErr("User not found"));
+                    console.log(generic_user_nf_err);
+                    return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 }
                 const response : IResponse<IUser> = {
                     type: RES_TYPE.AUTH_SUCCESS,
@@ -299,14 +288,12 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                         banner_pic: banner_return_url,
                     }
                 }
-                return res
-                        .status(200)
-                        .json(response);
+                return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
             }
         }
     } catch (e) {
-        console.log("Could not get a database connection")
-        return next(new ServErr("Could not get a database connection"));
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -318,18 +305,16 @@ export const getInfoHandler : RequestHandler = async (req, res, next) => {
             const [result, error] = await query_helper(connection, "SELECT username, summary, banner_public_id, profile_pic_id FROM users WHERE username = ?", [user_name]);
             if (error) {
                 if (error.code.match(/DEADLOCK/g)) {
+                    console.log(error.code);
                     continue;
                 } else {
                     console.log(error.code);
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (result.length <= 0) {
-                    await connection.release();
-                    return next(new AuthFailErr("User not found"));
+                    return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 } else {
-                    await connection.release();
                     const {
                         username,
                         summary,
@@ -347,11 +332,12 @@ export const getInfoHandler : RequestHandler = async (req, res, next) => {
                             banner_pic: banner_pic_url,
                         }
                     }
-                    return res.status(200).json(response);
+                    return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
                 }
             }
         }
     } catch (e) {
-        return next(new ServErr("Could not get a database connection"));
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }

@@ -6,10 +6,9 @@ import { ServErr } from "../utils/error_handling/ServErr";
 import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
 import { IComment, IPostInfo, IPostPayload, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
 import { NotFoundErr } from "../utils/error_handling/NotFoundErr";
+import { generic_db_msg, generic_fail_to_get_connection, generic_not_auth_err, generic_post_nf_err, generic_user_nf_err } from "../utils/generic_error_msg";
 
-const generic_db_msg = "Encountered a database error";
-const generic_user_nf_err = "User not found";
-const generic_post_nf_err = "Post not found";
+;
 
 export const uploadPostHandler: RequestHandler = async (req, res, next) => {
     const user_name = res.locals.user_name;
@@ -90,7 +89,7 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
         }
     } catch (e) {
         console.log('Could not get a database connection');
-        return next(new ServErr("Could not get a database connection"));
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -191,7 +190,7 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
         return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
     } catch (e) {
         console.log("Could not get a database connection");
-        return next(new ServErr("Could not get a database connection"));
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -199,7 +198,7 @@ export const addFavoritesHandler: RequestHandler = async (req, res, next) => {
     const user_name = res.locals.user_name;
     const post_id = req.body.post_id;
     if (!user_name) {
-        return next(new AuthFailErr("Not signed in"));
+        return next(new AuthFailErr(generic_not_auth_err));
     }
     console.log(`${user_name} trying to add ${post_id} to favorites`);
     try {
@@ -236,8 +235,8 @@ export const addFavoritesHandler: RequestHandler = async (req, res, next) => {
             }
         }
     } catch (e) {
-        console.log('Could not get a database connection');
-        return next(new ServErr("Could not get a database connection"));
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -245,7 +244,7 @@ export const removeFavoritesHandler: RequestHandler = async (req, res, next) => 
     const user_name = res.locals.user_name;
     const post_id = req.body.post_id;
     if (!user_name) {
-        return next(new AuthFailErr("Not signed in"));
+        return next(new AuthFailErr(generic_not_auth_err));
     }
     try {
         const connection = await mysql_pool.getConnection();
@@ -261,6 +260,7 @@ export const removeFavoritesHandler: RequestHandler = async (req, res, next) => 
                 }
             } else {
                 if (check_user.length === 0) {
+                    console.log(generic_user_nf_err);
                     return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 }
             }
@@ -278,7 +278,7 @@ export const removeFavoritesHandler: RequestHandler = async (req, res, next) => 
             }
         }
     } catch (e) {
-        console.log("Could not get a database connection");
-        return next(new ServErr("Could not get a database connection"));
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }

@@ -2,8 +2,9 @@ import { RequestHandler } from "express";
 import cloudinaryV2 from "../utils/cloudinary/cloudinary-util";
 import { NotFoundErr } from "../utils/error_handling/NotFoundErr";
 import { ServErr } from "../utils/error_handling/ServErr";
+import { generic_db_msg, generic_fail_to_get_connection, generic_user_nf_err } from "../utils/generic_error_msg";
 import { IPostInfo, IProfile, IResponse, ISearchPayload, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
-import mysql_pool, { commit_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
+import mysql_pool, { commit_helper, connection_release_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
 
 export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
     const user_name = req.params.user_name;
@@ -21,15 +22,13 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                     continue;
                 } else {
                     console.log(error.code);
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (result.length === 0) {
-                    await connection.release();
-                    return next(new NotFoundErr("The user was not found"));
+                    console.log(generic_user_nf_err);
+                    return await connection_release_helper(connection, next, new NotFoundErr(generic_user_nf_err));
                 } else {
-                    await connection.release();
                     profile_pic_id = result[0].profile_pic_id;
                     banner_id = result[0].banner_public_id;
                     summary = result[0].summary;
@@ -49,11 +48,10 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                 summary: summary,
             }
         }
-        return res
-                .status(200)
-                .json(response);
+        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
     } catch (e) {
-        return next(new ServErr("Could not get a database connection"));
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -73,9 +71,8 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
         while (loopController.current) {
             const err = await transaction_helper(connection);
             if (err) {
-                await connection.release();
                 console.log("Could not begin transaction");
-                return next(new ServErr("Encountered a database error"));
+                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
             const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM favorites WHERE username = ?", [user_name]);
             if (count_err) {
@@ -88,8 +85,7 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
                     console.log(count_err.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
             const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND post_public_id IN (SELECT post_public_id FROM favorites WHERE username = ?) ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
@@ -103,15 +99,13 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
                     console.log(error.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 count_pages = Math.ceil(count[0].count/limit);
                 query_arr = result;
                 await commit_helper(connection, next, loopController);
                 if (!loopController.current) return;
-                await connection.release();
                 break;
             }
         }
@@ -142,11 +136,10 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
                 posts: result_arr,
             },
         }
-        return res
-                .status(200)
-                .json(response);
+        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
     } catch (e) {
-        return next(new ServErr("Could not get a database connection"));
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }
 
@@ -166,9 +159,8 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
         while (loopController.current) {
             const err = await transaction_helper(connection);
             if (err) {
-                await connection.release();
                 console.log("Could not begin a transaction");
-                return next(new ServErr("Encountered a database error"));
+                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
             const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM posts WHERE artist_name = ?", [user_name]);
             if (count_err) {
@@ -181,8 +173,7 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
                     console.log(count_err.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Encountered a database error"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
             console.log(`${user_name} has ${count[0].count} posts`);
@@ -197,15 +188,13 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
                     console.log(error.code);
                     await rollback_helper(connection, next, loopController);
                     if (!loopController.current) return;
-                    await connection.release();
-                    return next(new ServErr("Something went wrong in the database"));
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 count_pages = Math.ceil(count[0].count/limit);
                 query_arr = result;
                 await commit_helper(connection, next, loopController);
                 if (!loopController.current) return;
-                await connection.release();
                 break;
             }
         }
@@ -236,10 +225,8 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
                 posts: result_arr,
             }
         }
-        return res
-                .status(200)
-                .json(response);
+        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
     } catch (e) {
-        return next(new ServErr("Could not get a database connection"));
+        return next(new ServErr(generic_fail_to_get_connection));
     }
 }

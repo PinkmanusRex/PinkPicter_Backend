@@ -80,6 +80,7 @@ export const uploadPostPic = async (file: Express.Multer.File, user_name: string
             public_id: arg_public_id.match(new RegExp(`^${user_name}/posts/(.+)$`))![1],
             folder: `${user_name}/posts`,
             overwrite: true,
+            invalidate: true,
         } : {
             folder: `${user_name}/posts`,
         }
