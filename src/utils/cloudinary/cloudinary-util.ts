@@ -33,6 +33,7 @@ export const uploadProfilePic = async (file: Express.Multer.File, user_name: str
                 public_id: `profile_pic`,
                 folder: `${user_name}/profile`,
                 overwrite: true,
+                invalidate: true,
             }, (err, res) => {
                 if (err) reject(err);
                 else resolve(res);
@@ -57,6 +58,7 @@ export const uploadBannerPic = async (file: Express.Multer.File, user_name: stri
                 public_id: 'banner_pic',
                 folder: `${user_name}/profile`,
                 overwrite: true,
+                invalidate: true,
             }, (err, res) => {
                 if (err) reject(err);
                 else resolve(res);
@@ -76,7 +78,7 @@ export const uploadBannerPic = async (file: Express.Multer.File, user_name: stri
 
 export const uploadPostPic = async (file: Express.Multer.File, user_name: string, arg_public_id : string | null) : Promise<[ICloudUploadResponse | null, cloudinary.UploadApiErrorResponse | null]> => {
     try {
-        const cloud_options = arg_public_id ? {
+        const cloud_options : cloudinary.UploadApiOptions = arg_public_id ? {
             public_id: arg_public_id.match(new RegExp(`^${user_name}/posts/(.+)$`))![1],
             folder: `${user_name}/posts`,
             overwrite: true,
