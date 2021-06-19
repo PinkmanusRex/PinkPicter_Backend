@@ -14,4 +14,10 @@ posts_router.post('/add_favorites', get_user_name, addFavoritesHandler)
 
 posts_router.post('/remove_favorites', get_user_name, removeFavoritesHandler)
 
+posts_router.get('/trending', )
+
+posts_router.get('/following_user_posts', isAuthenticated, )
+
+posts_router.get('/search', )
+
 export default posts_router;

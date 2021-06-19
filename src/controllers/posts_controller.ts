@@ -25,17 +25,25 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
                 console.log("Could not begin a transaction");
                 return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
-            const [check, check_error] = await query_helper(connection, "SELECT username FROM users WHERE username = ?", [user_name]);
-            if (check_error) {
-                if (check_error.code.match(/DEADLOCK/g)) {
-                    console.log(check_error.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+            const [lock, lock_err] = await query_helper(connection, "SELECT * FROM users WHERE username = ? FOR UPDATE", [user_name]);
+            if (lock_err) {
+                console.log(lock_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (lock_err.code.match(/DEADLOCK/g)) {
                     continue;
                 } else {
-                    console.log(check_error.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            const [check, check_error] = await query_helper(connection, "SELECT username FROM users WHERE username = ?", [user_name]);
+            if (check_error) {
+                console.log(check_error.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (check_error.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -58,20 +66,12 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
                 const height = (cld_result as ICloudUploadResponse).height;
                 const [result, error] = await query_helper(connection, "INSERT INTO posts(post_public_id, post_date, width, height, description, title, artist_name) VALUES(?, ?, ?, ?, ?, ?, ?)", [public_id, new Date(), width, height, req.body.description, req.body.title, user_name]);
                 if (error) {
+                    console.log(error.code);
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
                     if (error.code.match(/DEADLOCK/g)) {
-                        console.log(error.code);
-                        await rollback_helper(connection, next, loopController);
-                        if (!loopController.current) return;
                         continue;
-                    } else if (error.code.match(/ER_NO_REFERENCED_ROW/g)) {
-                        console.log(error.code);
-                        await rollback_helper(connection, next, loopController);
-                        if (!loopController.current) return;
-                        return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                     } else {
-                        console.log(error.code);
-                        await rollback_helper(connection, next, loopController);
-                        if (!loopController.current) return;
                         return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                     }
                 } else {
@@ -110,17 +110,25 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
                 console.log("Could not begin a transaction");
                 return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
-            const [post, post_err] = await query_helper(connection, "SELECT IF(EXISTS(SELECT * FROM favorites WHERE post_public_id = ? AND username = ?), TRUE, FALSE) as favorited, post_public_id, artist_name, title, description, width, height, post_date, profile_pic_id FROM posts, users WHERE artist_name = username AND post_public_id = ?", [post_id, user_name, post_id]);
-            if (post_err) {
-                if (post_err.code.match(/DEADLOCK/g)) {
-                    console.log(post_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+            const [user_lock, user_lock_err] = await query_helper(connection, "SELECT * FROM users WHERE username = ? FOR UPDATE", [user_name]);
+            if (user_lock_err) {
+                console.log(user_lock_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (user_lock_err.code.match(/DEADLOCK/g)) {
                     continue;
                 } else {
-                    console.log(post_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            const [post, post_err] = await query_helper(connection, "SELECT IF(EXISTS(SELECT * FROM favorites WHERE post_public_id = ? AND username = ?), TRUE, FALSE) as favorited, post_public_id, artist_name, title, description, width, height, post_date, profile_pic_id FROM posts, users WHERE artist_name = username AND post_public_id = ?", [post_id, user_name, post_id]);
+            if (post_err) {
+                console.log(post_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (post_err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -132,15 +140,12 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
             }
             const [comments, comments_err] = await query_helper(connection, "SELECT c.username as username, c.comment_content as comment_content, c.post_date as post_date, c.comment_id as comment_id, profile_pic_id FROM comments as c, users WHERE c.username = users.username AND c.post_public_id = ? ORDER BY c.comment_id DESC", [post_id]);
             if (comments_err) {
+                console.log(comments_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (comments_err.code.match(/DEADLOCK/g)) {
-                    console.log(comments_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     continue;
                 } else {
-                    console.log(comments_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -203,34 +208,58 @@ export const addFavoritesHandler: RequestHandler = async (req, res, next) => {
     console.log(`${user_name} trying to add ${post_id} to favorites`);
     try {
         const connection = await mysql_pool.getConnection();
-        while (true) {
-            const [check_user, check_user_error] = await query_helper(connection, "SELECT * FROM users WHERE username = ?", [user_name]);
-            if (check_user_error) {
-                if (check_user_error.code.match(/DEADLOCK/g)) {
-                    console.log(check_user_error.code);
+        const loopController = {
+            current: true,
+        }
+        while (loopController.current) {
+            const err = await transaction_helper(connection);
+            if (err) {
+                console.log("could not begin a transaction");
+                return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+            }
+            const [lock, lock_err] = await query_helper(connection, "SELECT * FROM users WHERE username = ? FOR UPDATE", [user_name]);
+            if (lock_err) {
+                console.log(lock_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (lock_err.code.match(/DEADLOCK/g)) {
                     continue;
                 } else {
-                    console.log(check_user_error.code);
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            const [check_user, check_user_error] = await query_helper(connection, "SELECT * FROM users WHERE username = ?", [user_name]);
+            if (check_user_error) {
+                console.log(check_user_error.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (check_user_error.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
                 if (check_user.length === 0) {
+                    await rollback_helper(connection, next, loopController);
+                    if (!loopController.current) return;
                     return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 }
             }
-            const [add_fav_result, add_fav_result_error] = await query_helper(connection, "INSERT INTO favorites (username, post_public_id, favorite_date) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE favorite_date = VALUES(favorite_date)", [user_name, post_id, new Date()]);
+            const [add_fav_result, add_fav_result_error] = await query_helper(connection, "INSERT IGNORE INTO favorites (username, post_public_id, favorite_date) VALUES (?, ?, ?)", [user_name, post_id, new Date()]);
             if (add_fav_result_error) {
+                console.log(add_fav_result_error.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (add_fav_result_error.code.match(/DEADLOCK/g)) {
-                    console.log(add_fav_result_error.code);
                     continue;
                 } else if (add_fav_result_error.code.match(/ER_NO_REFERENCED_ROW/g)) {
-                    console.log(add_fav_result_error.code);
                     return await connection_release_helper(connection, next, new NotFoundErr(generic_post_nf_err))
                 } else {
-                    console.log(add_fav_result_error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
+                await commit_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 return await connection_release_helper(connection, next, undefined, res.status(200).json({}))
             }
         }

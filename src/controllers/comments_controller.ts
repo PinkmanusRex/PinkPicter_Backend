@@ -23,47 +23,36 @@ export const addCommentsHandler: RequestHandler = async (req, res, next) => {
             }
             const [lock, lock_err] = await query_helper(connection, "SELECT * FROM users WHERE username = ? FOR UPDATE", [user_name]);
             if (lock_err) {
+                console.log(lock_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (lock_err.code.match(/DEADLOCK/g)) {
-                    console.log(lock_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     continue;
                 } else {
-                    console.log(lock_err.code);
-                    await rollback_helper(connection, next, loopController);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
             const [insertion_res, insertion_res_err] = await query_helper(connection, "INSERT INTO comments(post_public_id, username, comment_content, post_date) VALUES(?, ?, ?, ?)", [post_id, user_name, comment_content, new Date()])
             if (insertion_res_err) {
+                console.log(insertion_res_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (insertion_res_err.code.match(/DEADLOCK/g)) {
-                    console.log(insertion_res_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     continue;
                 } else if (insertion_res_err.code.match(/ER_NO_REFERENCED_ROW/g)) {
-                    console.log(insertion_res_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if(!loopController.current) return;
                     return await connection_release_helper(connection, next, new AuthFailErr(generic_user_nf_err));
                 } else {
-                    console.log(insertion_res_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
             const [date, date_err] = await query_helper(connection, "SELECT post_date FROM comments WHERE comment_id = ?", [insertion_res.insertId]);
             if (date_err) {
+                console.log(date_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (date_err.code.match(/DEADLOCK/g)) {
-                    console.log(date_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     continue;
                 } else {
-                    console.log(date_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -101,11 +90,10 @@ export const removeCommentsHandler: RequestHandler = async (req, res, next) => {
         while (true) {
             const [del, del_err] = await query_helper(connection, "DELETE FROM comments WHERE comment_id = ? AND username = ?", [comment_id, viewer_name]);
             if (del_err) {
+                console.log(del_err.code);
                 if (del_err.code.match(/DEADLOCK/g)) {
-                    console.log(del_err.code);
                     continue;
                 } else {
-                    console.log(del_err.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }

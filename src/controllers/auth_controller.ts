@@ -27,14 +27,12 @@ export const registrationHandler: RequestHandler = async (req, res, next) => {
         while (true) {
             const [result, error] = await query_helper(connection, "INSERT INTO users(username, password) VALUES(?, ?)", [user_name, bcrypt_password]);
             if (error) {
+                console.log(error.code);
                 if (error.code === 'ER_DUP_KEY') {
-                    console.log(`${error.code}: ${user_name}`);
                     return await connection_release_helper(connection, next, new AuthFailErr("Username already taken"));
                 } else if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
                     continue;
                 } else {
-                    console.log(error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -73,11 +71,10 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
         while (true) {
             const [result, error] = await query_helper(connection, "SELECT username, password, profile_pic_id, banner_public_id FROM users WHERE username = ?", [user_name]);
             if (error) {
+                console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
                     continue;
                 } else {
-                    console.log(error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -138,11 +135,10 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
             while (true) {
                 const [result, error] = await query_helper(connection, "SELECT username, profile_pic_id, banner_public_id FROM users WHERE username = ?", [user_name]);
                 if (error) {
+                    console.log(error.code);
                     if (error.code.match(/DEADLOCK/g)) {
-                        console.log(error.code);
                         continue;
                     } else {
-                        console.log(error.code);
                         return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                     }
                 } else {
@@ -186,11 +182,10 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
         while (true) {
             const [result, error] = await query_helper(connection, "SELECT username FROM users WHERE username = ?", [user_name]);
             if (error) {
+                console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
                     continue;
                 } else {
-                    console.log(error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -215,11 +210,10 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                     while (true) {
                         const [result, error] = await query_helper(connection, "UPDATE users SET profile_pic_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
                         if (error) {
+                            console.log(error.code);
                             if (error.code.match(/DEADLOCK/g)) {
-                                console.log(error.code);
                                 continue;
                             } else {
-                                console.log(error.code);
                                 return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                             }
                         } else {
@@ -244,11 +238,10 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                     while (true) {
                         const [result, error] = await query_helper(connection, "UPDATE users SET banner_public_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
                         if (error) {
+                            console.log(error.code);
                             if (error.code.match(/DEADLOCK/g)) {
-                                console.log(error.code);
                                 continue;
                             } else {
-                                console.log(error.code);
                                 return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                             }
                         } else {
@@ -268,11 +261,10 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
         while (true) {
             const [result, error] = await query_helper(connection, "UPDATE users SET summary = ? WHERE username = ?", [summary, user_name]);
             if (error) {
+                console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
                     continue;
                 } else {
-                    console.log(error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -304,11 +296,10 @@ export const getInfoHandler : RequestHandler = async (req, res, next) => {
         while (true) {
             const [result, error] = await query_helper(connection, "SELECT username, summary, banner_public_id, profile_pic_id FROM users WHERE username = ?", [user_name]);
             if (error) {
+                console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
                     continue;
                 } else {
-                    console.log(error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {

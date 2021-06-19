@@ -20,11 +20,10 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
         while (true) {
             const [result, error] = await query_helper(connection, "SELECT profile_pic_id, banner_public_id, summary, IF(EXISTS(SELECT * FROM following WHERE artist_name = ? AND username = ?), TRUE, FALSE) as does_follow FROM users WHERE username = ?", [user_name, viewer_name, user_name]);
             if (error) {
+                console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
                     continue;
                 } else {
-                    console.log(error.code);
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -79,31 +78,36 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
                 console.log("Could not begin transaction");
                 return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
-            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM favorites WHERE username = ?", [user_name]);
-            if (count_err) {
-                if (count_err.code.match(/DEADLOCK/g)) {
-                    console.log(count_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+            const [lock, lock_err] = await query_helper(connection, "SELECT * FROM users WHERE username = ? FOR UPDATE", [user_name]);
+            if (lock_err) {
+                console.log(lock_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (lock_err.code.match(/DEADLOCK/g)) {
                     continue;
                 } else {
-                    console.log(count_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM favorites WHERE username = ?", [user_name]);
+            if (count_err) {
+                console.log(count_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (count_err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
             const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND post_public_id IN (SELECT post_public_id FROM favorites WHERE username = ?) ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
+                console.log(error.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     continue;
                 } else {
-                    console.log(error.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
@@ -167,32 +171,37 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
                 console.log("Could not begin a transaction");
                 return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
             }
-            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM posts WHERE artist_name = ?", [user_name]);
-            if (count_err) {
-                if (count_err.code.match(/DEADLOCK/g)) {
-                    console.log(count_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+            const [lock, lock_err] = await query_helper(connection, "SELECT * FROM users WHERE username = ? FOR UPDATE", [user_name])
+            if (lock_err) {
+                console.log(lock_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (lock_err.code.match(/DEADLOCK/g)) {
                     continue;
                 } else {
-                    console.log(count_err.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM posts WHERE artist_name = ?", [user_name]);
+            if (count_err) {
+                console.log(count_err.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
+                if (count_err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
             console.log(`${user_name} has ${count[0].count} posts`);
             const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND username = ? ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
+                console.log(error.code);
+                await rollback_helper(connection, next, loopController);
+                if (!loopController.current) return;
                 if (error.code.match(/DEADLOCK/g)) {
-                    console.log(error.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     continue;
                 } else {
-                    console.log(error.code);
-                    await rollback_helper(connection, next, loopController);
-                    if (!loopController.current) return;
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             } else {
