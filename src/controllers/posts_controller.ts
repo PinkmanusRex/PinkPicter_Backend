@@ -95,7 +95,7 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
 
 export const getPostHandler: RequestHandler = async (req, res, next) => {
     const user_name = res.locals.user_name;
-    const post_id = req.body.post_id;
+    const post_id = req.params.post_id;
     console.log(`${user_name} attempting to retrieve ${post_id}`);
     try {
         const connection = await mysql_pool.getConnection();

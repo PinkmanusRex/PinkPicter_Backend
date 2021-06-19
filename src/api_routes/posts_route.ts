@@ -8,7 +8,7 @@ const posts_router = express.Router({mergeParams: true});
 
 posts_router.post('/upload', isAuthenticated, multerUtil.single('post_pic'), postValidator, uploadPostHandler);
 
-posts_router.post('/get_post', get_user_name, getPostHandler);
+posts_router.get('/get_post/:post_id(*)', get_user_name, getPostHandler);
 
 posts_router.post('/add_favorites', get_user_name, addFavoritesHandler)
 
