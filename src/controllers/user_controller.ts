@@ -7,15 +7,18 @@ import { IPostInfo, IProfile, IResponse, ISearchPayload, IUser, RES_TYPE } from 
 import mysql_pool, { commit_helper, connection_release_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
 
 export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
+    let viewer_name = res.locals.user_name;
     const user_name = req.params.user_name;
+    if (viewer_name === user_name) viewer_name = '';
     console.log(`Retrieving profile info for: ${user_name}`);
     try {
         const connection = await mysql_pool.getConnection();
         let profile_pic_id: string | null = null;
         let banner_id: string | null = null;
         let summary: string | null = null;
+        let following: boolean = false;
         while (true) {
-            const [result, error] = await query_helper(connection, "SELECT profile_pic_id, banner_public_id, summary FROM users WHERE username = ?", [user_name]);
+            const [result, error] = await query_helper(connection, "SELECT profile_pic_id, banner_public_id, summary, IF(EXISTS(SELECT * FROM following WHERE artist_name = ? AND username = ?), TRUE, FALSE) as does_follow FROM users WHERE username = ?", [user_name, viewer_name, user_name]);
             if (error) {
                 if (error.code.match(/DEADLOCK/g)) {
                     console.log(error.code);
@@ -29,6 +32,7 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                     console.log(generic_user_nf_err);
                     return await connection_release_helper(connection, next, new NotFoundErr(generic_user_nf_err));
                 } else {
+                    following = !!result[0].does_follow;
                     profile_pic_id = result[0].profile_pic_id;
                     banner_id = result[0].banner_public_id;
                     summary = result[0].summary;
@@ -46,6 +50,7 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                 banner_pic: banner_pic_url,
                 profile_pic: profile_pic_url,
                 summary: summary,
+                following: following,
             }
         }
         return await connection_release_helper(connection, next, undefined, res.status(200).json(response));

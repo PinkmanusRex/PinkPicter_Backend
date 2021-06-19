@@ -20,7 +20,7 @@ export interface IUser {
     banner_pic?: string | null | undefined,
 }
 
-export type IProfile = IUser & {summary?: string};
+export type IProfile = IUser & {summary?: string, following?: boolean};
 
 export interface IPostInfo {
     title: string,

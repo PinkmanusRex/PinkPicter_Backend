@@ -88,7 +88,7 @@ export const uploadPostHandler: RequestHandler = async (req, res, next) => {
             }
         }
     } catch (e) {
-        console.log('Could not get a database connection');
+        console.log(generic_fail_to_get_connection);
         return next(new ServErr(generic_fail_to_get_connection));
     }
 }
