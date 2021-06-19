@@ -3,6 +3,7 @@ import { addFavoritesHandler, getPostHandler, removeFavoritesHandler, uploadPost
 import { get_user_name, postValidator } from "../controllers/posts_controller_helper";
 import isAuthenticated from "../utils/jwt/jwt-util";
 import multerUtil from "../utils/multer/multer-util";
+import { searchQueryValidator } from "../utils/searching/search_helper";
 
 const posts_router = express.Router({mergeParams: true});
 
@@ -14,10 +15,10 @@ posts_router.post('/add_favorites', get_user_name, addFavoritesHandler)
 
 posts_router.post('/remove_favorites', get_user_name, removeFavoritesHandler)
 
-posts_router.get('/trending', )
+posts_router.get('/trending', searchQueryValidator, )
 
 posts_router.get('/following_user_posts', isAuthenticated, )
 
-posts_router.get('/search', )
+posts_router.get('/search', searchQueryValidator, )
 
 export default posts_router;
