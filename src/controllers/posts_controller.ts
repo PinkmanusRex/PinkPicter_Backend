@@ -389,6 +389,8 @@ export const getTrendingPostsHandler: RequestHandler = async (req, res, next) =>
 export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
     const query_terms = req.query.q;
     let sql_query = '';
+    let count_query = '';
+    let count_escape_arr: any[] = [];
     let sql_escape_arr = [];
     const page_no = (req.query.page_no) ? parseInt(req.query.page_no as string) : 1;
     const limit = (req.query.limit) ? parseInt(req.query.limit as string) : 20;
@@ -396,9 +398,13 @@ export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
     if (query_terms) {
         sql_query = `SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND MATCH(title) AGAINST(?) ORDER BY post_id DESC LIMIT ? OFFSET ?`;
         sql_escape_arr = [query_terms, limit, offset];
+        count_query = "SELECT COUNT(*) AS count FROM posts WHERE MATCH(title) AGAINST(?)";
+        count_escape_arr = [query_terms];
     } else {
         sql_query = `SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name ORDER BY post_id DESC LIMIT ? OFFSET ?`
         sql_escape_arr = [limit, offset];
+        count_query = "SELECT COUNT(*) AS count FROM posts";
+        count_escape_arr = [];
     }
     console.log(`${query_terms ? `Retrieving posts matching against ${query_terms}` : 'Retrieving posts'} page=${page_no}`);
     try {
@@ -406,7 +412,7 @@ export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
         let count_pages = 0;
         let query_arr: any = [];
         while (true) {
-            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM posts WHERE MATCH(title) AGAINST(?)", [query_terms])
+            const [count, count_err] = await query_helper(connection, count_query, count_escape_arr)
             if (count_err) {
                 console.log(count_err.code);
                 if (count_err.code.match(/DEADLOCK/g)) {
