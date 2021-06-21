@@ -336,10 +336,10 @@ export const getTrendingPostsHandler: RequestHandler = async (req, res, next) =>
             const [result, err] = await query_helper(connection, `SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name ORDER BY 
             (SELECT count_favorites + count_comments FROM 
                 (SELECT COUNT(*) AS count_favorites FROM favorites WHERE posts.post_public_id = favorites.post_public_id AND favorite_date 
-                    BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) 
+                    BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) AS f 
                 JOIN 
                 (SELECT COUNT(*) AS count_comments FROM comments WHERE posts.post_public_id = comments.post_public_id AND post_date 
-                    BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY))
+                    BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) AS c
             ) DESC LIMIT ? OFFSET ?`, [cur_date, cur_date, cur_date, cur_date, limit, offset]);
             if (err) {
                 console.log(err.code);
@@ -388,10 +388,19 @@ export const getTrendingPostsHandler: RequestHandler = async (req, res, next) =>
 
 export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
     const query_terms = req.query.q;
+    let sql_query = '';
+    let sql_escape_arr = [];
     const page_no = (req.query.page_no) ? parseInt(req.query.page_no as string) : 1;
     const limit = (req.query.limit) ? parseInt(req.query.limit as string) : 20;
     const offset = (page_no - 1) * limit;
-    console.log(`Retrieving posts matching against ${query_terms} page=${page_no}`);
+    if (query_terms) {
+        sql_query = `SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND MATCH(title) AGAINST(?) ORDER BY post_id DESC LIMIT ? OFFSET ?`;
+        sql_escape_arr = [query_terms, limit, offset];
+    } else {
+        sql_query = `SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name ORDER BY post_id DESC LIMIT ? OFFSET ?`
+        sql_escape_arr = [limit, offset];
+    }
+    console.log(`${query_terms ? `Retrieving posts matching against ${query_terms}` : 'Retrieving posts'} page=${page_no}`);
     try {
         const connection = await mysql_pool.getConnection();
         let count_pages = 0;
@@ -407,8 +416,7 @@ export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
                 }
             }
             console.log(`There are ${count[0].count} posts`);
-            const cur_date = new Date();
-            const [result, err] = await query_helper(connection, `SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND MATCH(title) AGAINST(?) ORDER BY post_id DESC LIMIT ? OFFSET ?`, [query_terms, limit, offset]);
+            const [result, err] = await query_helper(connection, sql_query, sql_escape_arr);
             if (err) {
                 console.log(err.code);
                 if (err.code.match(/DEADLOCK/g)) {
@@ -451,5 +459,72 @@ export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
         return await connection_release_helper(connection, next, undefined, res.status(200).json(response)); 
     } catch (e) {
         return next(new ServErr(generic_fail_to_get_connection));
+    }
+}
+
+export const getUserFollowingPostsHandler: RequestHandler = async (req, res, next) => {
+    const user_name = res.locals.user_name;
+    const page_no = (req.query.page_no) ? parseInt(req.query.page_no as string) : 1;
+    const limit = (req.query.limit) ? parseInt(req.query.limit as string) : 20;
+    const offset = (page_no - 1) * limit; 
+    console.log(`Retrieving posts by ${user_name}'s following list page=${page_no}`);
+    try {
+        const connection = await mysql_pool.getConnection();
+        let count_pages = 0;
+        let query_arr: any = [];
+        while (true) {
+            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM posts, following WHERE posts.artist_name = following.artist_name AND following.username = ?", [user_name]);
+            if (count_err) {
+                console.log(count_err.code);
+                if (count_err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            console.log(`There are ${count[0].count} posts`);
+            const [result, err] = await query_helper(connection, "SELECT post_public_id, width, height, title, posts.artist_name AS artist_name, profile_pic_id FROM posts, users, following WHERE users.username = posts.artist_name AND posts.artist_name = following.artist_name AND following.username = ? ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
+            if (err) {
+                console.log(err.code);
+                if (err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            } else {
+                count_pages = Math.ceil(count[0].count/limit);
+                query_arr = result;
+                break;
+            }
+        }
+        const result_arr = query_arr.map((item : any) => {
+            const title: string = item.title;
+            const src: string = cloudinaryV2.url(item.post_public_id);
+            const post_id: string = item.post_public_id;
+            const user: IUser = {
+                user_name: item.artist_name,
+                profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id) : null,
+            }
+            const width: number = item.width;
+            const height: number = item.height;
+            const post: IPostInfo = {
+                src,
+                post_id, user,
+                width,
+                height,
+                title,
+            }
+            return post;
+        })
+        const response: IResponse<ISearchPayload> = {
+            type: RES_TYPE.GET_SUCCESS,
+            payload: {
+                count_pages: count_pages,
+                posts: result_arr,
+            }
+        }
+        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
+    } catch (e) {
+        return next(new ServErr(generic_db_msg));
     }
 }
