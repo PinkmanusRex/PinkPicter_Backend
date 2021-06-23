@@ -26,7 +26,21 @@ export interface ICloudUploadResponse {
     url: string,
 }
 
-export const uploadProfilePic = async (file: Express.Multer.File, user_name: string): Promise<[ICloudUploadResponse | null, cloudinary.UploadApiErrorResponse | null]> => {
+export const deletePostPic = async (post_id: string): Promise<any[]> => {
+    try {
+        const cloudinary_res = await new Promise((resolve, reject) => {
+            cloudinaryV2.uploader.destroy(post_id, undefined, (error, result) => {
+                if (error) reject(error);
+                resolve(result);
+            })
+        })
+        return [cloudinary_res, null];
+    } catch (e) {
+        return [null, e];
+    }
+}
+
+export const uploadProfilePic = async (file: Express.Multer.File, user_name: string): Promise<[ICloudUploadResponse & {version: number} | null, cloudinary.UploadApiErrorResponse | null]> => {
     try {
         const cloudinary_res = await new Promise((resolve, reject) => {
             const cld_upload_stream = cloudinaryV2.uploader.upload_stream({
@@ -44,14 +58,15 @@ export const uploadProfilePic = async (file: Express.Multer.File, user_name: str
         const width = (cloudinary_res as cloudinary.UploadApiResponse).width;
         const height = (cloudinary_res as cloudinary.UploadApiResponse).height;
         const url = (cloudinary_res as cloudinary.UploadApiResponse).secure_url;
-        return [{ public_id, width, height, url }, null];
+        const version = (cloudinary_res as cloudinary.UploadApiResponse).version;
+        return [{ public_id, width, height, url, version }, null];
     } catch (e) {
         const err = (e as cloudinary.UploadApiErrorResponse);
         return [null, err];
     }
 }
 
-export const uploadBannerPic = async (file: Express.Multer.File, user_name: string) : Promise<[ICloudUploadResponse | null, cloudinary.UploadApiErrorResponse | null]> => {
+export const uploadBannerPic = async (file: Express.Multer.File, user_name: string) : Promise<[ICloudUploadResponse & {version: number} | null, cloudinary.UploadApiErrorResponse | null]> => {
     try{
         const cloudinary_res = await new Promise((resolve, reject) => {
             const cld_upload_stream = cloudinaryV2.uploader.upload_stream({
@@ -69,7 +84,8 @@ export const uploadBannerPic = async (file: Express.Multer.File, user_name: stri
         const width = (cloudinary_res as cloudinary.UploadApiResponse).width;
         const height = (cloudinary_res as cloudinary.UploadApiResponse).height;
         const url = (cloudinary_res as cloudinary.UploadApiResponse).secure_url;
-        return [{public_id, width, height, url}, null];
+        const version = (cloudinary_res as cloudinary.UploadApiResponse).version;
+        return [{public_id, width, height, url, version}, null];
     } catch (e) {
         const err = (e as cloudinary.UploadApiErrorResponse);
         return [null, err];

@@ -1,5 +1,5 @@
 import express from "express";
-import { addFavoritesHandler, getPostHandler, getSearchPostsHandler, getTrendingPostsHandler, getUserFollowingPostsHandler, removeFavoritesHandler, uploadPostHandler } from "../controllers/posts_controller";
+import { addFavoritesHandler, deletePostHandler, getPostHandler, getSearchPostsHandler, getTrendingPostsHandler, getUserFollowingPostsHandler, removeFavoritesHandler, uploadPostHandler } from "../controllers/posts_controller";
 import { get_user_name, postValidator } from "../controllers/posts_controller_helper";
 import isAuthenticated from "../utils/jwt/jwt-util";
 import multerUtil from "../utils/multer/multer-util";
@@ -20,5 +20,7 @@ posts_router.get('/trending', searchQueryValidator, getTrendingPostsHandler);
 posts_router.get('/following_user_posts', searchQueryValidator, isAuthenticated, getUserFollowingPostsHandler);
 
 posts_router.get('/search', searchQueryValidator, getSearchPostsHandler);
+
+posts_router.post('/delete', isAuthenticated, deletePostHandler);
 
 export default posts_router;

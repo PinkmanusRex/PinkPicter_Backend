@@ -69,7 +69,7 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
     try {
         const connection = await mysql_pool.getConnection();
         while (true) {
-            const [result, error] = await query_helper(connection, "SELECT username, password, profile_pic_id, banner_public_id FROM users WHERE username = ?", [user_name]);
+            const [result, error] = await query_helper(connection, "SELECT username, password, profile_pic_id, profile_pic_version, banner_public_id, banner_pic_version FROM users WHERE username = ?", [user_name]);
             if (error) {
                 console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
@@ -81,10 +81,14 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
                 if (result.length === 0) {
                     return await connection_release_helper(connection, next, new AuthFailErr("User credentials incorrect"));
                 } else {
-                    const { username, password, profile_pic_id, banner_public_id } = result[0];
+                    const { username, password, profile_pic_id, banner_public_id, profile_pic_version, banner_pic_version } = result[0];
                     if (bcryptjs.compareSync(user_password, password)) {
-                        const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
-                        const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id) : null;
+                        const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
+                            version: profile_pic_version,
+                        }) : null;
+                        const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id, {
+                            version: banner_pic_version,
+                        }) : null;
                         const response: IResponse<IUser> = {
                             type: RES_TYPE.LOGIN_SUCCESS,
                             payload: {
@@ -133,7 +137,7 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
         try {
             const connection = await mysql_pool.getConnection();
             while (true) {
-                const [result, error] = await query_helper(connection, "SELECT username, profile_pic_id, banner_public_id FROM users WHERE username = ?", [user_name]);
+                const [result, error] = await query_helper(connection, "SELECT username, profile_pic_id, profile_pic_version, banner_public_id, banner_pic_version FROM users WHERE username = ?", [user_name]);
                 if (error) {
                     console.log(error.code);
                     if (error.code.match(/DEADLOCK/g)) {
@@ -146,9 +150,13 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
                         console.log(`Verifying failed for : ${user_name}`);
                         return await connection_release_helper(connection, next, new AuthFailErr("Invalid authentication"));
                     } else {
-                        const { username, profile_pic_id, banner_public_id } = result[0];
-                        const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
-                        const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id) : null;
+                        const { username, profile_pic_id, banner_public_id, profile_pic_version, banner_pic_version } = result[0];
+                        const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
+                            version: profile_pic_version,
+                        }) : null;
+                        const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id, {
+                            version: banner_pic_version,
+                        }) : null;
                         const response: IResponse<IUser> = {
                             type: RES_TYPE.AUTH_SUCCESS,
                             payload: {
@@ -208,7 +216,7 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                 } else {
                     connection = await mysql_pool.getConnection();
                     while (true) {
-                        const [result, error] = await query_helper(connection, "UPDATE users SET profile_pic_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
+                        const [result, error] = await query_helper(connection, "UPDATE users SET profile_pic_id = ?, profile_pic_version = ? WHERE username = ?", [cld_result!.public_id, cld_result!.version, user_name]);
                         if (error) {
                             console.log(error.code);
                             if (error.code.match(/DEADLOCK/g)) {
@@ -236,7 +244,7 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
                 } else {
                     connection = await mysql_pool.getConnection();
                     while (true) {
-                        const [result, error] = await query_helper(connection, "UPDATE users SET banner_public_id = ? WHERE username = ?", [cld_result!.public_id, user_name]);
+                        const [result, error] = await query_helper(connection, "UPDATE users SET banner_public_id = ?, banner_pic_version = ? WHERE username = ?", [cld_result!.public_id, cld_result!.version, user_name]);
                         if (error) {
                             console.log(error.code);
                             if (error.code.match(/DEADLOCK/g)) {
@@ -294,7 +302,7 @@ export const getInfoHandler : RequestHandler = async (req, res, next) => {
     try {
         const connection = await mysql_pool.getConnection();
         while (true) {
-            const [result, error] = await query_helper(connection, "SELECT username, summary, banner_public_id, profile_pic_id FROM users WHERE username = ?", [user_name]);
+            const [result, error] = await query_helper(connection, "SELECT username, summary, banner_public_id, profile_pic_id, banner_pic_version, profile_pic_version FROM users WHERE username = ?", [user_name]);
             if (error) {
                 console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
@@ -311,9 +319,15 @@ export const getInfoHandler : RequestHandler = async (req, res, next) => {
                         summary,
                         banner_public_id,
                         profile_pic_id,
+                        profile_pic_version,
+                        banner_pic_version,
                     } = result[0];
-                    const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
-                    const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id) : null;
+                    const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
+                        version: profile_pic_version,
+                    }) : null;
+                    const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id, {
+                        version: banner_pic_version,
+                    }) : null;
                     const response : IResponse<IProfile> = {
                         type: RES_TYPE.AUTH_SUCCESS,
                         payload: {

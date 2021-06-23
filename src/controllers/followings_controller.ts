@@ -1,9 +1,11 @@
 import { RequestHandler } from "express";
+import cloudinaryV2 from "../utils/cloudinary/cloudinary-util";
 import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
 import { InvalidFieldError } from "../utils/error_handling/InvalidFieldError";
 import { NotFoundErr } from "../utils/error_handling/NotFoundErr";
 import { ServErr } from "../utils/error_handling/ServErr";
 import { generic_db_msg, generic_fail_to_get_connection, generic_not_auth_err, generic_user_nf_err } from "../utils/generic_error_msg";
+import { FollowList, IResponse, IUser, RES_TYPE } from "../utils/interfaces/response-interface";
 import mysql_pool, { commit_helper, connection_release_helper, query_helper, rollback_helper, transaction_helper } from "../utils/mysql/mysql-util";
 
 export const addFollowingHandler: RequestHandler = async (req, res, next) => {
@@ -89,6 +91,64 @@ export const removeFollowingHandler: RequestHandler = async (req, res, next) => 
             }
             return await connection_release_helper(connection, next, undefined, res.status(200).json({}));
         }
+    } catch (e) {
+        console.log(generic_fail_to_get_connection);
+        return next(new ServErr(generic_fail_to_get_connection));
+    }
+}
+
+export const getFollowingList: RequestHandler = async (req, res, next) => {
+    const viewer_name = res.locals.user_name;
+    const page_no = (req.query.page_no) ? parseInt(req.query.page_no as string) : 1;
+    const limit = (req.query.limit) ? parseInt(req.query.limit as string) : 20;
+    const offset = (page_no - 1) * limit;
+    let query_arr: any[] = [];
+    let count_pages = 1;
+    try {
+        const connection = await mysql_pool.getConnection();
+        while (true) {
+            const [count, count_err] = await query_helper(connection, "SELECT COUNT(*) AS count FROM following WHERE following.username = ?", [viewer_name]);
+            if (count_err) {
+                console.log(count_err.code);
+                if (count_err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            }
+            const [result, err] = await query_helper(connection, "SELECT profile_pic_id, profile_pic_version, users.username AS username FROM users, following WHERE users.username = following.artist_name AND following.username = ? ORDER BY users.username ASC LIMIT ? OFFSET ?", [viewer_name, limit, offset]);
+            if (err) {
+                console.log(err.code);
+                if (err.code.match(/DEADLOCK/g)) {
+                    continue;
+                } else {
+                    return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
+                }
+            } else {
+                count_pages = Math.ceil(count[0].count/limit);
+                query_arr = result;
+                break;
+            }
+        }
+        const result_arr = query_arr.map((item: any) => {
+            const user_name: string = item.username;
+            const profile_pic: string | null = (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
+                version: item.profile_pic_version,
+            }) : null;
+            const user : IUser = {
+                user_name,
+                profile_pic,
+            }
+            return user;
+        })
+        const response: IResponse<FollowList> = {
+            type: RES_TYPE.GET_SUCCESS,
+            payload: {
+                follow_list: result_arr,
+                count_pages,
+            },
+        }
+        return await connection_release_helper(connection, next, undefined, res.status(200).json(response));
     } catch (e) {
         console.log(generic_fail_to_get_connection);
         return next(new ServErr(generic_fail_to_get_connection));

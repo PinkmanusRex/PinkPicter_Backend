@@ -14,6 +14,11 @@ export enum RES_TYPE {
     GET_SUCCESS = "GET_SUCCESS",
 }
 
+export interface FollowList {
+    follow_list: IUser[],
+    count_pages: number,
+}
+
 export interface IUser {
     user_name: string,
     profile_pic?: string | null | undefined,

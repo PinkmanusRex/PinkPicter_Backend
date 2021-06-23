@@ -17,8 +17,10 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
         let banner_id: string | null = null;
         let summary: string | null = null;
         let following: boolean = false;
+        let banner_pic_version: number;
+        let profile_pic_version: number;
         while (true) {
-            const [result, error] = await query_helper(connection, "SELECT profile_pic_id, banner_public_id, summary, IF(EXISTS(SELECT * FROM following WHERE artist_name = ? AND username = ?), TRUE, FALSE) as does_follow FROM users WHERE username = ?", [user_name, viewer_name, user_name]);
+            const [result, error] = await query_helper(connection, "SELECT profile_pic_id, banner_public_id, profile_pic_version, banner_pic_version, summary, IF(EXISTS(SELECT * FROM following WHERE artist_name = ? AND username = ?), TRUE, FALSE) as does_follow FROM users WHERE username = ?", [user_name, viewer_name, user_name]);
             if (error) {
                 console.log(error.code);
                 if (error.code.match(/DEADLOCK/g)) {
@@ -35,12 +37,18 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
                     profile_pic_id = result[0].profile_pic_id;
                     banner_id = result[0].banner_public_id;
                     summary = result[0].summary;
+                    banner_pic_version = result[0].banner_pic_version;
+                    profile_pic_version = result[0].profile_pic_version;
                     break;
                 }
             }
         }
-        const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id) : null;
-        const banner_pic_url = (banner_id) ? await cloudinaryV2.url(banner_id) : null;
+        const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
+            version: profile_pic_version,
+        }) : null;
+        const banner_pic_url = (banner_id) ? await cloudinaryV2.url(banner_id, {
+            version: banner_pic_version,
+        }) : null;
         summary = (summary) ? summary : '';
         const response : IResponse<IProfile> = {
             type: RES_TYPE.GET_SUCCESS,
