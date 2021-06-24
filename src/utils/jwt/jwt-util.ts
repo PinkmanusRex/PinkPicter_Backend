@@ -4,9 +4,11 @@ import dotenv from "dotenv";
 import { CookieOptions, RequestHandler } from "express";
 import {AuthFailErr} from "../error_handling/AuthFailErr";
 
-dotenv.config({
-    path: path.join(__dirname, "../../../.env"),
-})
+if (process.env.NODE_ENV !== "production") {
+    dotenv.config({
+        path: path.join(__dirname, "../../../.env"),
+    })
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 

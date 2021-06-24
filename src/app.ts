@@ -8,9 +8,11 @@ import api_router from "./api_routes/api";
 import {IErrPayload, IResponse, RES_TYPE} from "./utils/interfaces/response-interface";
 import errorHandler from "./utils/error_handling/error-handler-util";
 
-dotenv.config({
-    path: path.join(__dirname, "../.env"),
-});
+if (process.env.NODE_ENV !== "production") {
+    dotenv.config({
+        path: path.join(__dirname, "../.env"),
+    });
+}
 
 const SERVER_HOST = process.env.SERVER_HOST || "localhost";
 const SERVER_PORT = process.env.SERVER_PORT || "8080";
@@ -18,7 +20,7 @@ const SERVER_PORT = process.env.SERVER_PORT || "8080";
 const app = express();
 
 app.use(cors({
-    origin: "http://localhost:3000",
+    origin: [/^http:\/\/localhost/,],
     optionsSuccessStatus: 200,
     credentials: true,
 }))

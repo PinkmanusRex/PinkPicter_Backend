@@ -3,9 +3,11 @@ import dotenv from "dotenv";
 import path from "path";
 import streamifier from "streamifier";
 
-dotenv.config({
-    path: path.join(__dirname, "../../../.env"),
-})
+if (process.env.NODE_ENV === "development") {
+    dotenv.config({
+        path: path.join(__dirname, "../../../.env"),
+    })
+}
 
 const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'put your cloud name';
 const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || 'put your api key';

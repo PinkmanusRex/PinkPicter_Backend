@@ -5,9 +5,11 @@ import { PoolConnection } from "mysql2/promise";
 import { NextFunction } from "express";
 import { ServErr } from "../error_handling/ServErr";
 
-dotenv.config({
-    path: path.join(__dirname, "../../../.env"),
-})
+if (process.env.NODE_ENV !== "production") {
+    dotenv.config({
+        path: path.join(__dirname, "../../../.env"),
+    })
+}
 
 const host = process.env.MYSQL_HOST || 'localhost';
 const user = process.env.MYSQL_USER || 'user';
