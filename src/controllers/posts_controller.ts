@@ -350,6 +350,7 @@ export const getTrendingPostsHandler: RequestHandler = async (req, res, next) =>
                     BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) AS c
             ) DESC LIMIT ? OFFSET ?`, [cur_date, cur_date, cur_date, cur_date, limit, offset]);
             if (err) {
+                console.log(cur_date, limit, offset);
                 console.log(err.code);
                 if (err.code.match(/DEADLOCK/g)) {
                     continue;
