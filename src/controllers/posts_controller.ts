@@ -160,6 +160,7 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
             const user_name: string = item.username;
             const profile_pic: string | null = (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
                 version: item.profile_pic_version,
+                secure: true,
             }) : null;
             const commenter: IUser = {
                 user_name,
@@ -175,12 +176,15 @@ export const getPostHandler: RequestHandler = async (req, res, next) => {
         })
         const post: IPostInfo = {
             title: query_post.title,
-            src: cloudinaryV2.url(query_post.post_public_id),
+            src: cloudinaryV2.url(query_post.post_public_id, {
+                secure: true,
+            }),
             post_id: query_post.post_public_id,
             user: {
                 user_name: query_post.artist_name,
                 profile_pic: query_post.profile_pic_id ? cloudinaryV2.url(query_post.profile_pic_id, {
                     version: query_post.profile_pic_version,
+                    secure: true,
                 }) : null,
             },
             width: query_post.width,
@@ -360,12 +364,15 @@ export const getTrendingPostsHandler: RequestHandler = async (req, res, next) =>
         }
         const result_arr = query_arr.map((item: any) => {
             const title: string = item.title;
-            const src: string = cloudinaryV2.url(item.post_public_id);
+            const src: string = cloudinaryV2.url(item.post_public_id, {
+                secure: true,
+            });
             const post_id: string = item.post_public_id;
             const user: IUser = {
                 user_name: item.artist_name,
                 profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
                     version: item.profile_pic_version,
+                    secure: true,
                 }) : null,
             }
             const width: number = item.width;
@@ -444,12 +451,15 @@ export const getSearchPostsHandler: RequestHandler = async (req, res, next) => {
         }
         const result_arr = query_arr.map((item: any) => {
             const title: string = item.title;
-            const src: string = cloudinaryV2.url(item.post_public_id);
+            const src: string = cloudinaryV2.url(item.post_public_id, {
+                secure: true,
+            });
             const post_id: string = item.post_public_id;
             const user: IUser = {
                 user_name: item.artist_name,
                 profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
                     version: item.profile_pic_version,
+                    secure: true,
                 }) : null,
             }
             const width: number = item.width;
@@ -513,12 +523,15 @@ export const getUserFollowingPostsHandler: RequestHandler = async (req, res, nex
         }
         const result_arr = query_arr.map((item: any) => {
             const title: string = item.title;
-            const src: string = cloudinaryV2.url(item.post_public_id);
+            const src: string = cloudinaryV2.url(item.post_public_id, {
+                secure: true,
+            });
             const post_id: string = item.post_public_id;
             const user: IUser = {
                 user_name: item.artist_name,
                 profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
                     version: item.profile_pic_version,
+                    secure: true,
                 }) : null,
             }
             const width: number = item.width;

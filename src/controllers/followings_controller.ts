@@ -134,6 +134,7 @@ export const getFollowingList: RequestHandler = async (req, res, next) => {
             const user_name: string = item.username;
             const profile_pic: string | null = (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
                 version: item.profile_pic_version,
+                secure: true,
             }) : null;
             const user : IUser = {
                 user_name,

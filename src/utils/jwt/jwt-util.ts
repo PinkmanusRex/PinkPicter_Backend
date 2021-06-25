@@ -18,18 +18,21 @@ const one_year = one_day * 365;
 const access_token_options : CookieOptions = {
     httpOnly: true,
     maxAge: one_day,
-    sameSite: 'lax',
+    sameSite: 'none',
+    secure: true,
 }
 
 const refresh_token_options : CookieOptions = {
     httpOnly: true,
     maxAge: one_year,
-    sameSite: 'lax',
+    sameSite: 'none',
+    secure: true,
 }
 
 const clearOptions : CookieOptions = {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'none',
+    secure: true,
 }
 
 const isAuthenticated: RequestHandler = async (req, res, next) => {

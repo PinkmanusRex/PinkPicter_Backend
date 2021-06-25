@@ -45,9 +45,11 @@ export const getUserInfoHandler : RequestHandler = async (req, res, next) => {
         }
         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
             version: profile_pic_version,
+            secure: true,
         }) : null;
         const banner_pic_url = (banner_id) ? await cloudinaryV2.url(banner_id, {
             version: banner_pic_version,
+            secure: true,
         }) : null;
         summary = (summary) ? summary : '';
         const response : IResponse<IProfile> = {
@@ -108,7 +110,7 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
                     return await connection_release_helper(connection, next, new ServErr(generic_db_msg));
                 }
             }
-            const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND post_public_id IN (SELECT post_public_id FROM favorites WHERE username = ?) ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
+            const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id, profile_pic_version FROM posts, users WHERE username = artist_name AND post_public_id IN (SELECT post_public_id FROM favorites WHERE username = ?) ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
                 console.log(error.code);
                 await rollback_helper(connection, next, loopController);
@@ -128,11 +130,16 @@ export const getUserFavoritesHandler : RequestHandler = async (req, res, next) =
         }
         const result_arr = query_arr.map((item : any) => {
             const title: string = item.title;
-            const src : string = cloudinaryV2.url(item.post_public_id);
+            const src : string = cloudinaryV2.url(item.post_public_id, {
+                secure: true,
+            });
             const post_id : string = item.post_public_id;
             const user : IUser = {
                 user_name: item.artist_name,
-                profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id) : null,
+                profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
+                    version: item.profile_pic_version,
+                    secure: true,
+                }) : null,
             }
             const width : number = item.width;
             const height : number = item.height;
@@ -202,7 +209,7 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
                 }
             }
             console.log(`${user_name} has ${count[0].count} posts`);
-            const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id FROM posts, users WHERE username = artist_name AND username = ? ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
+            const [result, error] = await query_helper(connection, "SELECT post_public_id, width, height, title, artist_name, profile_pic_id, profile_pic_version FROM posts, users WHERE username = artist_name AND username = ? ORDER BY post_id DESC LIMIT ? OFFSET ?", [user_name, limit, offset]);
             if (error) {
                 console.log(error.code);
                 await rollback_helper(connection, next, loopController);
@@ -222,11 +229,16 @@ export const getUserPostsHandler : RequestHandler = async (req, res, next) => {
         }
         const result_arr = query_arr.map((item : any) => {
             const title: string = item.title;
-            const src : string = cloudinaryV2.url(item.post_public_id);
+            const src : string = cloudinaryV2.url(item.post_public_id, {
+                secure: true,
+            });
             const post_id : string = item.post_public_id;
             const user : IUser = {
                 user_name: item.artist_name,
-                profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id) : null,
+                profile_pic: (item.profile_pic_id) ? cloudinaryV2.url(item.profile_pic_id, {
+                    version: item.profile_pic_version,
+                    secure: true,
+                }) : null,
             }
             const width : number = item.width;
             const height : number = item.height;

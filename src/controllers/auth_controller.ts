@@ -85,9 +85,11 @@ export const loginHandler: RequestHandler = async (req, res, next) => {
                     if (bcryptjs.compareSync(user_password, password)) {
                         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
                             version: profile_pic_version,
+                            secure: true,
                         }) : null;
                         const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id, {
                             version: banner_pic_version,
+                            secure: true,
                         }) : null;
                         const response: IResponse<IUser> = {
                             type: RES_TYPE.LOGIN_SUCCESS,
@@ -153,9 +155,11 @@ export const verifyAuth: RequestHandler = async (req, res, next) => {
                         const { username, profile_pic_id, banner_public_id, profile_pic_version, banner_pic_version } = result[0];
                         const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
                             version: profile_pic_version,
+                            secure: true,
                         }) : null;
                         const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id, {
                             version: banner_pic_version,
+                            secure: true,
                         }) : null;
                         const response: IResponse<IUser> = {
                             type: RES_TYPE.AUTH_SUCCESS,
@@ -324,9 +328,11 @@ export const getInfoHandler : RequestHandler = async (req, res, next) => {
                     } = result[0];
                     const profile_pic_url = (profile_pic_id) ? await cloudinaryV2.url(profile_pic_id, {
                         version: profile_pic_version,
+                        secure: true,
                     }) : null;
                     const banner_pic_url = (banner_public_id) ? await cloudinaryV2.url(banner_public_id, {
                         version: banner_pic_version,
+                        secure: true,
                     }) : null;
                     const response : IResponse<IProfile> = {
                         type: RES_TYPE.AUTH_SUCCESS,

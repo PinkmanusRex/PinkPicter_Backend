@@ -20,7 +20,7 @@ const SERVER_PORT = process.env.SERVER_PORT || "8080";
 const app = express();
 
 app.use(cors({
-    origin: [/^http:\/\/localhost/,],
+    origin: [/^http:\/\/localhost/, /pink-picter.netlify.app/],
     optionsSuccessStatus: 200,
     credentials: true,
 }))
