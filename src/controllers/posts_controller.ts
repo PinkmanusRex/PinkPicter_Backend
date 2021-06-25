@@ -342,15 +342,11 @@ export const getTrendingPostsHandler: RequestHandler = async (req, res, next) =>
             console.log(`There are ${count[0].count} posts`);
             const cur_date = new Date();
             const [result, err] = await query_helper(connection, `SELECT post_public_id, width, height, title, artist_name, profile_pic_id, profile_pic_version FROM posts, users WHERE username = artist_name ORDER BY 
-            (SELECT count_favorites + count_comments FROM 
-                (SELECT COUNT(*) AS count_favorites FROM favorites WHERE posts.post_public_id = favorites.post_public_id AND favorite_date 
-                    BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) AS f 
-                JOIN 
-                (SELECT COUNT(*) AS count_comments FROM comments WHERE posts.post_public_id = comments.post_public_id AND post_date 
-                    BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) AS c
-            ) DESC LIMIT ? OFFSET ?`, [cur_date, cur_date, cur_date, cur_date, limit, offset]);
+                (SELECT COUNT(*) FROM favorites WHERE posts.post_public_id = favorites.post_public_id AND favorite_date BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) 
+                +
+                (SELECT COUNT(*) FROM comments WHERE posts.post_public_id = comments.post_public_id AND post_date BETWEEN DATE_SUB(?, INTERVAL 3 DAY) AND DATE_ADD(?, INTERVAL 4 DAY)) 
+            DESC LIMIT ? OFFSET ?`, [cur_date, cur_date, cur_date, cur_date, limit, offset]);
             if (err) {
-                console.log(cur_date, limit, offset);
                 console.log(err.code);
                 if (err.code.match(/DEADLOCK/g)) {
                     continue;
