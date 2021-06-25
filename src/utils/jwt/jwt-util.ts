@@ -41,10 +41,10 @@ const isAuthenticated: RequestHandler = async (req, res, next) => {
     const refresh_token = req.cookies && req.cookies.refresh_token;
     const [decoded_access, error_access] = (access_token) ? await verifyJWT(access_token) : [null, new Error()];
     if (error_access) {
-        console.log('access_token expired...attempting to use refresh_token');
+        console.log(access_token ? 'access_token expired...attempting to use refresh_token' : 'No access_token provided...attempting to use refresh token...');
         const [decoded_refresh, error_refresh] = (refresh_token) ? await verifyJWT(refresh_token) : [null, new Error()];
         if (error_refresh) {
-            console.log("refresh_token expired...")
+            console.log(refresh_token ? "refresh_token expired..." : "refresh_token not provided...");
             next(new AuthFailErr("You are not authenticated"))
         } else {
             const user_name = decoded_refresh.user_name;
