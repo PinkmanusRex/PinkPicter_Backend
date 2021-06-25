@@ -14,8 +14,7 @@ if (process.env.NODE_ENV !== "production") {
     });
 }
 
-const SERVER_HOST = process.env.SERVER_HOST || "localhost";
-const SERVER_PORT = process.env.SERVER_PORT || "8080";
+const SERVER_PORT = process.env.PORT || "8080";
 
 const app = express();
 
