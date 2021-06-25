@@ -9,8 +9,8 @@ export const commentValidator: RequestHandler = async (req, res, next) => {
     } else {
         if (typeof comment !== 'string') {
             return next(new InvalidFieldError("Must provide a typed comment"));
-        } else if (comment.length > 5_000) {
-            return next(new InvalidFieldError("Comment must be less than 5000 characters"));
+        } else if (comment.length > 1000) {
+            return next(new InvalidFieldError("Comment must be less than 1000 characters"));
         } else {
             const split_str = comment.split(/\s+/);
             if (!split_str.some(token => token.length >= 3)) {

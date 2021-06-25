@@ -8,6 +8,7 @@ import { AuthFailErr } from "../utils/error_handling/AuthFailErr";
 import { ServErr } from "../utils/error_handling/ServErr";
 import {multerFields} from "../utils/multer/multer-util";
 import { generic_db_msg, generic_fail_to_get_connection, generic_user_nf_err } from "../utils/generic_error_msg";
+import { InvalidFieldError } from "../utils/error_handling/InvalidFieldError";
 
 const validateUsernamePassword = (username: string, password: string) => {
     return !!(username.match(/^[a-zA-Z0-9_]{8,20}$/g) && password.match(/^[a-zA-Z0-9_]{8,20}$/g));
@@ -189,6 +190,7 @@ export const editProfileHandler: RequestHandler = async (req, res, next) => {
     console.log(`Editing profile of: ${user_name}`);
     let banner_return_url : string | null = null;
     let profile_return_url : string | null = null;
+    if (req.body.summary && req.body.summary.length > 1000) return next(new InvalidFieldError("Summary must be less than 1000 characters"));
     try {
         let connection = await mysql_pool.getConnection();
         while (true) {

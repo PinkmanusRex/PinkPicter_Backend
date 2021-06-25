@@ -12,6 +12,10 @@ export const postValidator : RequestHandler = async (req, res, next) => {
             console.log("No description provided");
             return next(new InvalidFieldError("Must provide description"));
         }
+        if (req.body.description.length > 1000) {
+            console.log(`Description is ${req.body.description.length} characters long`);
+            return next(new InvalidFieldError("Description must be less than 1000 characters"));
+        }
         if (!req.body.title) {
             console.log("No title provided");
             return next(new InvalidFieldError("Must provide a title"));
